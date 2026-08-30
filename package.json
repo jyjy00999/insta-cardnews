@@ -1,0 +1,17 @@
+{
+  "name": "insta-cardnews",
+  "version": "1.0.0",
+  "description": "인스타툰·카드뉴스 AI 메이커",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.35.0",
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
