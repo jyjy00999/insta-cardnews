@@ -7,6 +7,35 @@ const app = express();
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ── PWA 아이콘 (SVG → PNG 대체) ────────────────────────────────
+function makeIconSvg(size) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#4F46E5"/>
+    </linearGradient>
+  </defs>
+  <rect width="${size}" height="${size}" rx="${size*0.18}" fill="url(#bg)"/>
+  <rect x="${size*0.21}" y="${size*0.16}" width="${size*0.58}" height="${size*0.68}" rx="${size*0.06}" fill="rgba(255,255,255,0.95)"/>
+  <rect x="${size*0.31}" y="${size*0.27}" width="${size*0.38}" height="${size*0.045}" rx="${size*0.022}" fill="#7C3AED"/>
+  <rect x="${size*0.31}" y="${size*0.37}" width="${size*0.27}" height="${size*0.045}" rx="${size*0.022}" fill="#D94500"/>
+  <rect x="${size*0.31}" y="${size*0.47}" width="${size*0.34}" height="${size*0.04}" rx="${size*0.02}" fill="rgba(120,120,120,0.3)"/>
+  <rect x="${size*0.31}" y="${size*0.56}" width="${size*0.28}" height="${size*0.04}" rx="${size*0.02}" fill="rgba(120,120,120,0.2)"/>
+  <text x="${size*0.5}" y="${size*0.8}" font-size="${size*0.18}" text-anchor="middle">✨</text>
+</svg>`;
+}
+app.get('/icon-192.png', (req, res) => {
+  res.setHeader('Content-Type', 'image/svg+xml');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.send(makeIconSvg(192));
+});
+app.get('/icon-512.png', (req, res) => {
+  res.setHeader('Content-Type', 'image/svg+xml');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.send(makeIconSvg(512));
+});
+
 const FOOD_KW = ['김밥','라면','치킨','피자','파스타','초밥','삼겹살','떡볶이','냉면','순대','갈비','삼계탕','된장','찌개','음식','요리','맛집','레시피','칼로리','식당','카페','커피','음료','디저트','케이크','빵','과자','스낵','제품','화장품','스킨케어','짜장','쌀국수','고기','채소','과일','반찬','소주','막걸리'];
 const PLACE_KW = ['여행','풍경','관광','장소','호텔','카페투어','길거리','자연','바다','산','도시','거리','공원','건물','스팟','뷰','경치'];
 
