@@ -243,6 +243,11 @@ JSON만 응답:
 
 // ── 로컬 IP 조회 ───────────────────────────────────────────────
 app.get('/api/local-ip', (req, res) => {
+  // Render 등 클라우드 배포 시 공개 URL 사용
+  if (process.env.RENDER_EXTERNAL_URL) {
+    const url = process.env.RENDER_EXTERNAL_URL;
+    return res.json({ ip: 'cloud', port: 443, url });
+  }
   const nets = os.networkInterfaces();
   let localIp = 'localhost';
   outer: for (const name of Object.keys(nets)) {
