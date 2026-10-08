@@ -255,9 +255,11 @@ input[type=range]{flex:1;height:4px;accent-color:var(--p1);cursor:pointer}
   <div class="modal">
     <h2>⚙️ 설정</h2>
     <div class="modal-field">
-      <label>AI API 키 <span id="provider-badge" style="font-size:.7rem;padding:2px 8px;border-radius:99px;margin-left:6px;vertical-align:middle"></span></label>
-      <input type="text" id="input-apikey" placeholder="gsk_... (Groq 무료 추천)" style="font-family:monospace;font-size:.8rem" oninput="updateProviderBadge()">
-      <div class="api-key-hint">키 앞글자를 보고 어느 서비스인지 자동으로 알아봅니다 · 이 브라우저에만 저장됩니다</div>
+      <label>AI API 키 <span style="font-weight:400;opacity:.65;font-size:.75rem">— 여러 개를 줄바꿈으로</span></label>
+      <textarea id="input-apikey" rows="4" placeholder="gsk_...&#10;AIza...&#10;sk-ant-..." oninput="renderKeyList()"
+        style="font-family:monospace;font-size:.78rem;line-height:1.6;resize:vertical;width:100%;padding:8px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surf2);color:var(--tx);outline:none"></textarea>
+      <div class="api-key-hint">한 줄에 하나씩 · 이 브라우저에만 저장 · 세 탭이 함께 씁니다</div>
+      <div id="key-list" style="margin-top:9px;font-size:.73rem;line-height:1.6"></div>
     </div>
 
     <div style="background:var(--surf2);border:1.5px solid var(--border);border-radius:var(--r-sm);padding:11px 13px;margin-bottom:14px;font-size:.78rem;line-height:1.75">
@@ -279,6 +281,7 @@ input[type=range]{flex:1;height:4px;accent-color:var(--p1);cursor:pointer}
         <span><b>Pollinations</b> — 키 없이, 사용량 제한 있음</span>
       </div>
       <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);color:var(--tx2)">
+        여러 개를 넣어두면 앞에서부터 쓰고, 크레딧이 떨어지면 다음 키로 넘어갑니다.<br>
         캐릭터 이미지 분석은 Gemini·Claude 키에서만 됩니다.
       </div>
     </div>
@@ -374,10 +377,11 @@ input[type=range]{flex:1;height:4px;accent-color:var(--p1);cursor:pointer}
   </main>
 </div>
 
+<script src="keys.js"></script>
 <script>
 // ── 상태 ─────────────────────────────────────────────────────
 let slides = [], charDesc = '', needsChar = false, artStyle = 'webtoon';
-let apiKey = localStorage.getItem('cn_apikey') || '';
+let apiKey = StudioKeys.get();
 let stopFlag = false;
 let characters = [], selectedChar = -1;
 
@@ -402,22 +406,13 @@ function loadImage(src){ return new Promise((r,j)=>{ const i=new Image(); i.cros
 function toggleTheme(){ const c=document.documentElement.getAttribute('data-theme')||'light'; document.documentElement.setAttribute('data-theme',c==='dark'?'light':'dark') }
 
 // ── 설정 ─────────────────────────────────────────────────────
-// 키 앞글자로 어느 서비스인지 가린다. 서버의 detectProvider 와 같은 규칙.
-function detectProvider(k){
-  if(!k) return {id:'free', name:'Pollinations (무료)', color:'#64748b'};
-  if(k.startsWith('sk-ant-')) return {id:'anthropic', name:'Claude (유료)', color:'#D97757'};
-  if(k.startsWith('AIza'))    return {id:'gemini',    name:'Google Gemini', color:'#4285F4'};
-  if(k.startsWith('gsk_'))    return {id:'groq',      name:'Groq (무료)',   color:'#16a34a'};
-  return {id:'unknown', name:'알 수 없는 형식', color:'#dc2626'};
-}
-function updateProviderBadge(){
-  const el=document.getElementById('provider-badge'); if(!el) return;
-  const p=detectProvider(document.getElementById('input-apikey').value.trim());
-  el.textContent=p.name; el.style.background=p.color+'22'; el.style.color=p.color;
-}
-function openSettings(){ document.getElementById('input-apikey').value=apiKey; updateProviderBadge(); document.getElementById('modal-settings').classList.add('show') }
+// 키는 StudioKeys(keys.js)가 세 탭 공용으로 들고 있다.
+function renderKeyList(){ StudioKeys.renderList(document.getElementById('key-list'), document.getElementById('input-apikey').value) }
+function openSettings(){ document.getElementById('input-apikey').value=apiKey; renderKeyList(); document.getElementById('modal-settings').classList.add('show') }
 function closeSettings(){ document.getElementById('modal-settings').classList.remove('show') }
-function saveSettings(){ apiKey=document.getElementById('input-apikey').value.trim(); localStorage.setItem('cn_apikey',apiKey); closeSettings(); showErr('') }
+function saveSettings(){ apiKey=StudioKeys.set(document.getElementById('input-apikey').value); closeSettings(); showErr('') }
+// 다른 탭에서 키를 바꾸면 여기도 따라간다
+StudioKeys.onChange(v => { apiKey = v });
 document.getElementById('modal-settings').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeSettings() })
 
 // ── 스타일 ───────────────────────────────────────────────────
@@ -797,11 +792,8 @@ async function downloadAll(){
 }
 
 // ── 초기화 ───────────────────────────────────────────────────
-
-// ── PWA 서비스워커 등록 ───────────────────────────────────────
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/sw.js').catch(()=>{});
-}
+// 서비스워커 등록은 최상위 셸(index.html)이 맡는다.
+// 이 화면은 iframe 안에서 돌기 때문에 여기서 등록하면 실패한다.
 </script>
 </body>
 </html>

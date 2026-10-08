@@ -211,9 +211,11 @@ select.finp option{background:var(--surf)}
   <div class="modal">
     <h2>⚙️ 설정</h2>
     <div class="fgrp">
-      <label class="flbl">AI API 키 <span id="provider-badge" style="font-size:.68rem;padding:2px 8px;border-radius:99px;margin-left:6px;vertical-align:middle"></span></label>
-      <input class="finp" type="password" id="inp-apikey" placeholder="gsk_... (Groq 무료 추천)" oninput="updateProviderBadge()">
-      <div style="font-size:.7rem;color:var(--tx3);margin-top:4px">키 앞글자로 어느 서비스인지 자동 판별 · 이 브라우저에만 저장</div>
+      <label class="flbl">AI API 키 <span style="font-weight:400;opacity:.65;font-size:.74rem">— 여러 개를 줄바꿈으로</span></label>
+      <textarea class="finp" id="inp-apikey" rows="4" placeholder="gsk_...&#10;AIza...&#10;sk-ant-..." oninput="renderKeyList()"
+        style="font-family:monospace;font-size:.76rem;line-height:1.6;resize:vertical"></textarea>
+      <div style="font-size:.7rem;color:var(--tx3);margin-top:4px">한 줄에 하나씩 · 이 브라우저에만 저장 · 세 탭이 함께 씁니다</div>
+      <div id="key-list" style="margin-top:9px;font-size:.71rem;line-height:1.6"></div>
     </div>
 
     <div style="background:var(--bg2,rgba(255,255,255,.04));border:1px solid var(--bd,rgba(255,255,255,.1));border-radius:10px;padding:11px 13px;margin-bottom:14px;font-size:.72rem;line-height:1.8">
@@ -223,6 +225,7 @@ select.finp option{background:var(--surf)}
       <div><code style="opacity:.8">sk-ant-</code> &nbsp;<b>Claude</b> — 품질 최상, 유료</div>
       <div><code style="opacity:.8">비움</code> &nbsp;<b>Pollinations</b> — 키 없이, 사용량 제한</div>
       <div style="margin-top:7px;padding-top:7px;border-top:1px solid var(--bd,rgba(255,255,255,.1));color:var(--tx3)">
+        여러 개를 넣어두면 앞에서부터 쓰고, 크레딧이 떨어지면 다음 키로 넘어갑니다.<br>
         참고 영상 썸네일 분석은 Gemini·Claude 키에서만 됩니다.<br>
         대본은 프롬프트가 길어 키 없이는 안 됩니다. 이미지와 음성은 키 없이 됩니다.
       </div>
@@ -391,9 +394,10 @@ select.finp option{background:var(--surf)}
 </main>
 </div>
 
+<script src="keys.js"></script>
 <script>
 // ── 상태 ──────────────────────────────────────────────────────
-let apiKey  = localStorage.getItem('reel_apikey') || '';
+let apiKey = StudioKeys.get();
 let duration = 15, artStyle = 'trendy';
 let currentScript = null, sceneImages = {};
 let videoBlob = null, videoUrl = null;
@@ -407,28 +411,19 @@ let selectedIdx = -1;
 let videoRef = null;      // {title, author, thumbnail, platform}
 
 // ── 설정 ──────────────────────────────────────────────────────
-// 키 앞글자로 어느 서비스인지 가린다. 서버의 detectProvider 와 같은 규칙.
-function detectProvider(k){
-  if(!k) return {name:'Pollinations (무료)', color:'#64748b'};
-  if(k.startsWith('sk-ant-')) return {name:'Claude (유료)',  color:'#D97757'};
-  if(k.startsWith('AIza'))    return {name:'Google Gemini',  color:'#4285F4'};
-  if(k.startsWith('gsk_'))    return {name:'Groq (무료)',    color:'#16a34a'};
-  return {name:'알 수 없는 형식', color:'#dc2626'};
-}
-function updateProviderBadge(){
-  const el = document.getElementById('provider-badge'); if(!el) return;
-  const p = detectProvider(document.getElementById('inp-apikey').value.trim());
-  el.textContent = p.name; el.style.background = p.color + '22'; el.style.color = p.color;
+// 키는 StudioKeys(keys.js)가 세 탭 공용으로 들고 있다.
+function renderKeyList(){
+  StudioKeys.renderList(document.getElementById('key-list'), document.getElementById('inp-apikey').value);
 }
 function openSettings(){
   document.getElementById('inp-apikey').value = apiKey;
-  updateProviderBadge();
+  renderKeyList();
   document.getElementById('modal-settings').classList.add('show');
 }
+StudioKeys.onChange(v => { apiKey = v });
 function closeSettings(){ document.getElementById('modal-settings').classList.remove('show') }
 function saveSettings(){
-  apiKey = document.getElementById('inp-apikey').value.trim();
-  localStorage.setItem('reel_apikey', apiKey);
+  apiKey = StudioKeys.set(document.getElementById('inp-apikey').value);
   closeSettings();
 }
 document.getElementById('modal-settings').addEventListener('click', e => { if(e.target===e.currentTarget) closeSettings() });

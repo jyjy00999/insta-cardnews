@@ -187,6 +187,14 @@
   var saved = null;
   try { saved = localStorage.getItem('studio_tab'); } catch(e){}
   select(location.hash.slice(1) || saved || 'cardnews', true);
+
+  // PWA 서비스워커. 최상위 문서에서만 등록된다 — 각 앱은 iframe 안이라
+  // 거기서 등록하면 "unknown error when fetching the script" 로 실패한다.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('sw.js').catch(function(){});
+    });
+  }
 })();
 </script>
 </body>

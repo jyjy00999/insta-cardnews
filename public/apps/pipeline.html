@@ -968,11 +968,10 @@ textarea::placeholder, input[type="text"]::placeholder { color: var(--text-muted
       </span>
     </div>
 
-    <label class="modal-label">API 키 <span id="provider-badge" style="margin-left:6px;font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px;background:rgba(99,102,241,.15);color:#818cf8"></span></label>
-    <input type="text" id="api-key-input" placeholder="AIza... / gsk_... / sk-ant-... / 비워두면 무료" style="margin-bottom:4px" oninput="updateProviderBadge()">
-    <p class="modal-hint" id="api-hint">
-      키를 입력하지 않으면 Pollinations.ai(무료)로 자동 실행됩니다
-    </p>
+    <label class="modal-label">API 키 <span style="margin-left:6px;font-size:11px;font-weight:400;opacity:.65">— 여러 개를 줄바꿈으로</span></label>
+    <textarea id="api-key-input" rows="4" placeholder="gsk_...&#10;AIza...&#10;sk-ant-..." style="margin-bottom:4px;font-family:monospace;font-size:12px;line-height:1.6;resize:vertical;width:100%" oninput="renderKeyList()"></textarea>
+    <p class="modal-hint">한 줄에 하나씩 · 세 탭이 함께 씁니다 · 앞에서부터 쓰고 막히면 다음 키로 넘어갑니다</p>
+    <div id="key-list" style="margin:8px 0 4px;font-size:11.5px;line-height:1.6"></div>
 
     <label class="modal-label" style="margin-top:4px">AI 모델 선택 <span style="font-size:11px;color:#9ca3af">(Anthropic 키 사용 시)</span></label>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
@@ -1002,6 +1001,7 @@ textarea::placeholder, input[type="text"]::placeholder { color: var(--text-muted
   </div>
 </div>
 
+<script src="keys.js"></script>
 <script>
 // ─── State ──────────────────────────────────────────────────────────────────
 
@@ -1021,7 +1021,7 @@ const STAGES = ['researcher', 'planner', 'writer', 'reviewer', 'publisher'];
 // ─── Init ────────────────────────────────────────────────────────────────────
 
 (function init() {
-  apiKey = localStorage.getItem('ig_apiKey') || '';
+  apiKey = StudioKeys.get();
   const storedModel = localStorage.getItem('ig_model') || '';
   // Gemini 모델이 저장돼 있으면 Claude 기본값으로 리셋
   currentModel = (storedModel && !storedModel.startsWith('gemini'))
@@ -1573,26 +1573,15 @@ function detectProvider(key) {
   return 'anthropic';
 }
 
-function updateProviderBadge() {
-  const key = document.getElementById('api-key-input').value.trim();
-  const badge = document.getElementById('provider-badge');
-  const hint  = document.getElementById('api-hint');
-  const p = detectProvider(key);
-  const map = {
-    free:      { label:'🆓 무료 (Pollinations)', color:'#22c55e', bg:'rgba(34,197,94,.15)', hint:'API 키 없이 무료로 사용 (품질 보통)' },
-    gemini:    { label:'✨ Google Gemini', color:'#818cf8', bg:'rgba(99,102,241,.15)', hint:'무료 API 키 사용 중 (품질 우수)' },
-    groq:      { label:'⚡ Groq (Llama)', color:'#f97316', bg:'rgba(249,115,22,.15)', hint:'초고속 무료 API 사용 중' },
-    anthropic: { label:'🔵 Claude (Anthropic)', color:'#9333ea', bg:'rgba(147,51,234,.15)', hint:'유료 Claude API 사용 중' }
-  };
-  const m = map[p] || map.free;
-  badge.textContent = m.label;
-  badge.style.color = m.color; badge.style.background = m.bg;
-  if(hint) hint.textContent = m.hint;
+// 키는 StudioKeys(keys.js)가 세 탭 공용으로 들고 있다.
+function renderKeyList() {
+  StudioKeys.renderList(document.getElementById('key-list'), document.getElementById('api-key-input').value);
 }
+StudioKeys.onChange(v => { apiKey = v });
 
 function openSettings() {
   document.getElementById('api-key-input').value = apiKey;
-  updateProviderBadge();
+  renderKeyList();
   const sel = document.getElementById('model-select');
   sel.value = currentModel;
   if (!sel.value) {
@@ -1614,11 +1603,10 @@ function closeSettingsOutside(e) {
 }
 
 function saveSettings() {
-  apiKey = document.getElementById('api-key-input').value.trim();
+  apiKey = StudioKeys.set(document.getElementById('api-key-input').value);
   currentModel = document.getElementById('model-select').value;
   naverClientId = document.getElementById('naver-id-input').value.trim();
   naverClientSecret = document.getElementById('naver-secret-input').value.trim();
-  localStorage.setItem('ig_apiKey', apiKey);
   localStorage.setItem('ig_model', currentModel);
   localStorage.setItem('ig_naver_id', naverClientId);
   localStorage.setItem('ig_naver_secret', naverClientSecret);
