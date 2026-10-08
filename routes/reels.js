@@ -95,7 +95,7 @@ JSON만 응답:
 }`;
 
   try {
-    res.json(parseJson(await callAI(apiKey, prompt, 4000), '스크립트'));
+    res.json(parseJson(await callAI(apiKey, prompt, 8000), '스크립트'));
   } catch (err) {
     const { status, msg } = toClientError(err);
     res.status(status).json({ error: msg });

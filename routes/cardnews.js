@@ -59,7 +59,7 @@ imagePrompt는 Pollinations.ai 이미지 생성용 영어 (캐릭터+장면, 흰
 }`;
 
   try {
-    const data = parseJson(await callAI(apiKey, prompt, 4000), '스토리');
+    const data = parseJson(await callAI(apiKey, prompt, 8000), '스토리');
 
     const needsCharacter = !forceNoChar && !!data.needsCharacter && !!data.characterDesc;
     const characterDesc = needsCharacter ? (data.characterDesc || '') : '';

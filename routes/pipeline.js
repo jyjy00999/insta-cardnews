@@ -179,7 +179,7 @@ router.post('/suggest-topics', async (req, res) => {
 ["주제1", "주제2", "주제3", "주제4", "주제5", "주제6", "주제7", "주제8", "주제9", "주제10"]`;
 
   try {
-    const text = await callAI(apiKey, prompt, 2000);
+    const text = await callAI(apiKey, prompt, 3000);
     const match = text.match(/\[[\s\S]*\]/);
     if (!match) throw new Error('응답 파싱 실패');
     res.json({ topics: JSON.parse(match[0]) });
@@ -240,7 +240,7 @@ ${needsCharHint}
 }`;
 
   try {
-    const raw = (await callAI(apiKey, prompt, 4000)).trim();
+    const raw = (await callAI(apiKey, prompt, 8000)).trim();
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('파싱 실패: ' + raw.slice(0, 300));
     const data = JSON.parse(match[0]);
