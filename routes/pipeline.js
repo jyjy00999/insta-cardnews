@@ -4,7 +4,7 @@ const express = require('express');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { callAI, callAIStream, detectProvider, proxyPollinationsImage } = require('../lib/ai');
+const { callAI, callAIStream, detectProvider, proxyPollinationsImage, toClientError } = require('../lib/ai');
 const { STAGES } = require('./pipeline-stages');
 
 const router = express.Router();
@@ -87,17 +87,20 @@ async function runPipeline(job, apiKey) {
           continue;
         }
 
-        const provider = detectProvider(apiKey);
-        const keyGuide = provider === 'gemini' ? 'Google Gemini API 키(AIza...)' :
-                         provider === 'groq'   ? 'Groq API 키(gsk_...)' :
-                         provider === 'free'   ? 'Pollinations 서버' :
-                         'Anthropic API 키(sk-ant-...)';
-        const msg = (status === 401 || status === 403 || /api.?key|invalid|authentication/i.test(err.message || ''))
-          ? `API 키가 올바르지 않습니다. ⚙️ 설정에서 ${keyGuide}를 확인해주세요.`
-          : status === 429 ? '요청 한도 초과. 잠시 후 다시 시도해주세요.'
-          : status === 529 ? 'AI 서버가 일시적으로 과부하 상태입니다. 잠시 후 재시도해주세요.'
-          : status === 404 ? '모델을 찾을 수 없습니다.'
-          : err.message || '알 수 없는 오류';
+        // 크레딧 소진·한도 초과 같은 건 공용 매퍼가 한국어 안내로 바꿔준다.
+        let msg = toClientError(err).msg;
+        if (status === 401 || status === 403 || /api.?key|invalid|authentication/i.test(err.message || '')) {
+          const provider = detectProvider(apiKey);
+          const keyGuide = provider === 'gemini' ? 'Google Gemini API 키(AIza...)' :
+                           provider === 'groq'   ? 'Groq API 키(gsk_...)' :
+                           provider === 'free'   ? 'Pollinations 서버' :
+                           'Anthropic API 키(sk-ant-...)';
+          msg = `API 키가 올바르지 않습니다. ⚙️ 설정에서 ${keyGuide}를 확인해주세요.`;
+        } else if (status === 529) {
+          msg = 'AI 서버가 일시적으로 과부하 상태입니다. 잠시 후 재시도해주세요.';
+        } else if (status === 404) {
+          msg = '모델을 찾을 수 없습니다.';
+        }
         emit(job, 'stage_error', { stage: stage.id, message: msg });
         job.status = 'error';
         return;
@@ -182,7 +185,7 @@ router.post('/suggest-topics', async (req, res) => {
     res.json({ topics: JSON.parse(match[0]) });
   } catch (err) {
     console.error('[pipeline/suggest-topics]', err.message);
-    res.status(err.status || 500).json({ error: err.message || '알 수 없는 오류' });
+    { const e = toClientError(err); res.status(e.status).json({ error: e.msg }); }
   }
 });
 
@@ -256,7 +259,7 @@ ${needsCharHint}
     res.json({ characterDesc: needsCharacter ? (data.characterDesc || '') : '', needsCharacter, slides });
   } catch (err) {
     console.error('[pipeline/generate-slide-prompts]', err.message);
-    res.status(err.status || 500).json({ error: err.message });
+    { const e = toClientError(err); res.status(e.status).json({ error: e.msg }); }
   }
 });
 
