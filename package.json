@@ -1,7 +1,7 @@
 {
-  "name": "insta-cardnews",
-  "version": "1.0.0",
-  "description": "인스타툰·카드뉴스 AI 메이커",
+  "name": "insta-studio",
+  "version": "2.0.0",
+  "description": "인스타 스튜디오 — 카드뉴스·릴스 메이커·콘텐츠 파이프라인",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

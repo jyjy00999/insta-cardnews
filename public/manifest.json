@@ -1,11 +1,11 @@
 {
-  "name": "인스타카드뉴스 AI 메이커",
-  "short_name": "카드뉴스",
-  "description": "AI로 인스타그램 카드뉴스를 자동 생성",
+  "name": "인스타 스튜디오 — 카드뉴스·릴스·파이프라인",
+  "short_name": "인스타 스튜디오",
+  "description": "AI로 인스타그램 카드뉴스, 릴스 영상, 콘텐츠 파이프라인을 한곳에서",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FDFAF4",
-  "theme_color": "#6D28D9",
+  "background_color": "#14131A",
+  "theme_color": "#4F46E5",
   "orientation": "portrait-primary",
   "icons": [
     {
@@ -20,6 +20,11 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "shortcuts": [
+    { "name": "카드뉴스",    "url": "/#cardnews" },
+    { "name": "릴스 메이커", "url": "/#reels" },
+    { "name": "파이프라인",  "url": "/#pipeline" }
   ],
   "categories": ["productivity", "utilities"],
   "lang": "ko"

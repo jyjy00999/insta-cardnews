@@ -1,0 +1,2625 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>인스타그램 파이프라인</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="인스타AI">
+<meta name="theme-color" content="#833AB4">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #faf8ff;
+  --surface: #ffffff;
+  --surface2: #f4f2ff;
+  --border: #e8e4f4;
+  --text: #1a1525;
+  --text-soft: #6b6080;
+  --text-muted: #a89ec0;
+  --purple: #833AB4;
+  --pink: #E1306C;
+  --orange: #F77737;
+  --grad: linear-gradient(135deg, #833AB4, #E1306C, #F77737);
+  --grad-soft: linear-gradient(135deg, rgba(131,58,180,.08), rgba(225,48,108,.06));
+  --purple-soft: #f0eaff;
+  --pink-soft: #fce7f0;
+  --green: #1a7f5c;
+  --green-soft: #e2f0eb;
+  --red: #dc2626;
+  --red-soft: #fef2f2;
+  --shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
+  --shadow-lg: 0 4px 24px rgba(0,0,0,.10);
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+/* ── Dark mode ── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:         #100c1a;
+    --surface:    #1c1628;
+    --surface2:   #231d33;
+    --border:     #3a2f55;
+    --text:       #f0ecfa;
+    --text-soft:  #b8aad4;
+    --text-muted: #6a5a8a;
+    --purple-soft:#2a1a3a;
+    --pink-soft:  #2a1020;
+    --green-soft: #0f2e22;
+    --red-soft:   #2a0f0f;
+    --shadow:     0 1px 3px rgba(0,0,0,.3), 0 4px 12px rgba(0,0,0,.2);
+    --shadow-lg:  0 4px 24px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  --bg:         #100c1a;
+  --surface:    #1c1628;
+  --surface2:   #231d33;
+  --border:     #3a2f55;
+  --text:       #f0ecfa;
+  --text-soft:  #b8aad4;
+  --text-muted: #6a5a8a;
+  --purple-soft:#2a1a3a;
+  --pink-soft:  #2a1020;
+  --green-soft: #0f2e22;
+  --red-soft:   #2a0f0f;
+  --shadow:     0 1px 3px rgba(0,0,0,.3), 0 4px 12px rgba(0,0,0,.2);
+  --shadow-lg:  0 4px 24px rgba(0,0,0,.4);
+}
+
+body {
+  font-family: 'Noto Sans KR', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+/* ── Header ── */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  position: sticky; top: 0; z-index: 100;
+}
+.header-inner {
+  max-width: 1100px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 60px; gap: 16px;
+}
+.logo {
+  display: flex; align-items: center; gap: 10px;
+  font-weight: 700; font-size: 17px; color: var(--text);
+}
+.logo-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: var(--grad);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.btn-settings {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--surface);
+  color: var(--text-soft); font-size: 13px; cursor: pointer;
+  transition: all .15s; font-family: inherit;
+}
+.btn-settings:hover { border-color: var(--purple); color: var(--purple); }
+
+/* ── Main ── */
+main { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
+
+/* ── Input Card ── */
+.input-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px;
+  margin-bottom: 24px; box-shadow: var(--shadow);
+}
+.input-card h2 {
+  font-size: 15px; font-weight: 600; margin-bottom: 16px;
+}
+.form-row { display: flex; gap: 12px; align-items: flex-end; }
+.form-group { flex: 1; }
+.form-group label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: var(--text-soft); text-transform: uppercase;
+  letter-spacing: .04em; margin-bottom: 6px;
+}
+textarea, input[type="text"] {
+  width: 100%; padding: 10px 14px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 14px; font-family: inherit; color: var(--text);
+  background: var(--surface); transition: border-color .15s; resize: none;
+}
+textarea:focus, input[type="text"]:focus {
+  outline: none; border-color: var(--purple);
+}
+textarea::placeholder, input[type="text"]::placeholder { color: var(--text-muted); }
+
+/* Post type tabs */
+.post-type-tabs {
+  display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap;
+}
+.post-type-btn {
+  padding: 7px 16px; border: 1.5px solid var(--border);
+  border-radius: 20px; font-size: 13px; font-weight: 500;
+  color: var(--text-soft); background: var(--surface);
+  cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.post-type-btn.active {
+  border-color: var(--purple); color: var(--purple);
+  background: var(--purple-soft);
+}
+.post-type-btn:hover:not(.active) { border-color: var(--text-muted); }
+
+/* Slide count */
+.slide-count-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 16px; font-size: 13px; color: var(--text-soft);
+}
+.slide-count-row input[type="range"] {
+  width: 120px; padding: 0; border: none; accent-color: var(--purple);
+}
+.slide-count-val {
+  font-weight: 700; color: var(--purple);
+  min-width: 24px; text-align: center;
+}
+
+/* Action buttons */
+.btn-run {
+  padding: 11px 24px; border: none; border-radius: var(--radius-sm);
+  background: var(--grad); color: #fff; font-weight: 700;
+  font-size: 14px; cursor: pointer; white-space: nowrap;
+  transition: opacity .15s, transform .1s; font-family: inherit;
+}
+.btn-run:hover { opacity: .88; }
+.btn-run:active { transform: scale(.97); }
+.btn-run:disabled { opacity: .5; cursor: not-allowed; }
+
+.btn-secondary {
+  padding: 10px 18px; border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--surface);
+  color: var(--text-soft); font-size: 13px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; transition: all .15s; font-family: inherit;
+}
+.btn-secondary:hover { border-color: var(--purple); color: var(--purple); }
+
+/* ── Pipeline ── */
+.pipeline-label {
+  font-size: 12px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .05em;
+  margin-bottom: 12px;
+}
+.pipeline {
+  display: flex; gap: 10px; margin-bottom: 28px; flex-wrap: wrap;
+}
+.stage-card {
+  flex: 1; min-width: 160px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; box-shadow: var(--shadow); position: relative;
+  transition: border-color .2s, box-shadow .2s;
+}
+.stage-card.running {
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px rgba(131,58,180,.12), var(--shadow);
+}
+.stage-card.complete { border-color: var(--green); }
+.stage-card.error { border-color: var(--red); }
+
+.stage-icon { font-size: 22px; margin-bottom: 8px; }
+.stage-name { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+.stage-desc { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; }
+.stage-status {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600; padding: 3px 8px;
+  border-radius: 20px; background: var(--surface2);
+  color: var(--text-muted);
+}
+.stage-status.running {
+  background: var(--purple-soft); color: var(--purple);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.stage-status.complete { background: var(--green-soft); color: var(--green); }
+.stage-status.error { background: var(--red-soft); color: var(--red); }
+
+.stage-errmsg {
+  margin-top: 8px; font-size: 11px; color: var(--red);
+  background: var(--red-soft); border-radius: 6px;
+  padding: 6px 8px; line-height: 1.4;
+}
+.stage-retry-btn {
+  margin-top: 8px; padding: 5px 10px;
+  border: 1px solid var(--red); border-radius: var(--radius-sm);
+  background: none; color: var(--red); font-size: 11px;
+  font-family: inherit; cursor: pointer; font-weight: 600;
+  transition: all .15s;
+}
+.stage-retry-btn:hover { background: var(--red-soft); }
+
+.stage-progress {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+  border-radius: 0 0 var(--radius) var(--radius); overflow: hidden;
+}
+.stage-progress-bar {
+  height: 100%; background: var(--grad); width: 0%;
+  transition: width .3s ease;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .6; }
+}
+
+/* ── Output Area ── */
+.output-section {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.output-tabs {
+  display: flex; border-bottom: 1px solid var(--border);
+  overflow-x: auto; scrollbar-width: none;
+}
+.output-tabs::-webkit-scrollbar { display: none; }
+.output-tab {
+  padding: 12px 18px; font-size: 13px; font-weight: 600;
+  color: var(--text-muted); cursor: pointer; white-space: nowrap;
+  border-bottom: 2px solid transparent; transition: all .15s;
+  font-family: inherit; background: none; border-top: none;
+  border-left: none; border-right: none;
+}
+.output-tab:hover { color: var(--text); }
+.output-tab.active { color: var(--purple); border-bottom-color: var(--purple); }
+.output-tab.done { color: var(--text-soft); }
+.output-tab.done::after { content: ' ✓'; color: var(--green); font-size: 11px; }
+
+.output-body { padding: 24px; min-height: 300px; }
+.output-empty {
+  text-align: center; color: var(--text-muted);
+  padding: 60px 20px; font-size: 14px;
+}
+.output-empty .empty-icon { font-size: 40px; margin-bottom: 12px; }
+
+/* Markdown output */
+.md-output { font-size: 14px; line-height: 1.8; }
+.md-output h1 { font-size: 20px; font-weight: 700; margin: 0 0 16px; color: var(--text); }
+.md-output h2 { font-size: 16px; font-weight: 600; margin: 20px 0 10px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.md-output h3 { font-size: 14px; font-weight: 600; margin: 14px 0 6px; color: var(--text); }
+.md-output p { margin-bottom: 10px; }
+.md-output ul, .md-output ol { margin: 8px 0 12px 20px; }
+.md-output li { margin-bottom: 4px; }
+.md-output strong { font-weight: 700; }
+.md-output em { font-style: italic; color: var(--text-soft); }
+.md-output code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-size: 12px; font-family: monospace; }
+.md-output blockquote { border-left: 3px solid var(--purple); padding-left: 14px; color: var(--text-soft); margin: 10px 0; }
+.md-output hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+/* Publisher special output */
+.publisher-output { display: flex; flex-direction: column; gap: 20px; }
+.copy-block {
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.copy-block-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+.copy-block-title { font-size: 12px; font-weight: 700; color: var(--text-soft); }
+.copy-block-meta { display: flex; align-items: center; gap: 8px; }
+.char-count { font-size: 11px; color: var(--text-muted); }
+.char-count.warn { color: #d97706; }
+.char-count.over { color: var(--red); }
+.btn-copy {
+  padding: 4px 12px; background: var(--grad); color: #fff;
+  border: none; border-radius: 6px; font-size: 11px; font-weight: 700;
+  cursor: pointer; font-family: inherit; transition: opacity .15s;
+}
+.btn-copy:hover { opacity: .85; }
+.btn-copy.copied { background: var(--green); }
+.copy-block-body {
+  padding: 14px; font-size: 14px; line-height: 1.8;
+  white-space: pre-wrap; color: var(--text);
+  max-height: 320px; overflow-y: auto;
+}
+
+/* Hashtag display */
+.hashtag-group { margin-bottom: 12px; }
+.hashtag-group-label { font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+.hashtag-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.hashtag-chip {
+  padding: 3px 10px; background: var(--purple-soft);
+  color: var(--purple); border-radius: 20px; font-size: 12px;
+  font-weight: 500;
+}
+
+/* Suggest topics */
+.suggest-btn {
+  padding: 9px 16px; border: 1.5px solid var(--purple);
+  border-radius: var(--radius-sm); background: var(--purple-soft);
+  color: var(--purple); font-size: 13px; font-weight: 700;
+  cursor: pointer; white-space: nowrap; transition: all .15s; font-family: inherit;
+  display: flex; align-items: center; gap: 6px;
+}
+.suggest-btn:hover { background: var(--purple); color: #fff; }
+.suggest-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.suggest-panel {
+  margin-top: 14px; padding: 16px;
+  background: var(--grad-soft); border: 1px solid var(--border);
+  border-radius: var(--radius); display: none;
+}
+.suggest-panel.show { display: block; }
+.suggest-panel-title {
+  font-size: 12px; font-weight: 700; color: var(--text-soft);
+  margin-bottom: 10px; text-transform: uppercase; letter-spacing: .04em;
+}
+.suggest-chips { display: flex; flex-direction: column; gap: 6px; }
+.suggest-err-box {
+  padding: 12px 16px; border-radius: var(--radius-sm);
+  background: rgba(220,38,38,.1); border: 1.5px solid rgba(220,38,38,.35);
+  color: var(--text); line-height: 1.6; font-size: 13px;
+}
+.suggest-chip {
+  padding: 10px 14px; border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--surface);
+  color: var(--text); font-size: 13px; cursor: pointer;
+  transition: all .15s; text-align: left; font-family: inherit;
+  line-height: 1.4;
+}
+.suggest-chip:hover { border-color: var(--purple); color: var(--purple); background: var(--purple-soft); }
+.suggest-chip.selected { border-color: var(--pink); color: var(--pink); background: var(--pink-soft); }
+.suggest-loading { text-align: center; padding: 20px; color: var(--text-muted); font-size: 13px; }
+
+/* Streaming cursor */
+.streaming-cursor::after {
+  content: '▋'; animation: blink .7s step-end infinite; color: var(--purple);
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── Settings Modal ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.4);
+  z-index: 200; display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 28px; width: 100%; max-width: 500px;
+  box-shadow: var(--shadow-lg); max-height: 90vh; overflow-y: auto;
+}
+.modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+.modal-sub { font-size: 13px; color: var(--text-soft); margin-bottom: 22px; }
+.modal-label {
+  font-size: 12px; font-weight: 600; color: var(--text-soft);
+  text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px;
+  display: block;
+}
+.modal-hint { font-size: 12px; color: var(--text-muted); margin: 6px 0 16px; }
+.modal-hint a { color: var(--purple); }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 22px; }
+.modal-select {
+  width: 100%; padding: 10px 14px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 14px; font-family: inherit; background: var(--surface);
+  color: var(--text); cursor: pointer; margin-bottom: 4px;
+}
+.modal-select:focus { outline: none; border-color: var(--purple); }
+.btn-check { padding: 8px 14px; font-size: 12px; }
+
+/* ── Network bar ── */
+.network-bar {
+  display: none;
+  align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 9px 16px;
+  margin-bottom: 18px; font-size: 12px; color: var(--text-soft);
+}
+.network-bar.show { display: flex; }
+.network-url {
+  font-family: monospace; font-weight: 600;
+  color: var(--purple); cursor: pointer; text-decoration: underline;
+}
+.network-badge {
+  padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 600;
+}
+.network-badge.tunnel { background: var(--green-soft); color: var(--green); }
+.network-badge.local  { background: var(--purple-soft); color: var(--purple); }
+
+/* Utility */
+.hidden { display: none !important; }
+.flex-gap { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+/* Mobile */
+@media (max-width: 700px) {
+  main { padding: 16px 16px 60px; }
+  .pipeline { flex-direction: column; }
+  .stage-card { min-width: unset; }
+  .form-row { flex-direction: column; }
+  header { padding: 0 16px; }
+}
+
+/* ── 인라인 캡션 편집기 아이템 ── */
+.ig-inline-text {
+  padding: 12px 14px; font-size: 14px; line-height: 1.75;
+  background: var(--surface2); border-radius: var(--radius-sm);
+}
+.ig-text-md { color: var(--text); }
+.ig-inline-media {
+  padding: 12px 14px;
+  background: var(--surface2); border-radius: var(--radius-sm);
+}
+
+/* ── (구) 아이템 카드 — 드래그용 — */
+.ig-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 12px 14px;
+  cursor: default;
+}
+.ig-item.dragging { opacity: .4; }
+.ig-drag-handle {
+  cursor: grab; font-size: 18px; color: var(--text-muted);
+  padding-top: 2px; user-select: none; flex-shrink: 0;
+}
+.ig-item-body { flex: 1; min-width: 0; }
+.ig-text-content { font-size: 14px; line-height: 1.7; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.ig-item-ctrl {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
+}
+.ic-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px;
+  border: 1.5px dashed var(--border); border-radius: 6px;
+  background: var(--surface); color: var(--text-soft);
+  font-size: 12px; font-family: inherit; cursor: pointer;
+  transition: all .14s; white-space: nowrap;
+}
+.ic-btn:hover { border-color: var(--purple); color: var(--purple); background: var(--purple-soft); border-style: solid; }
+.ic-btn.ic-del:hover { border-color: var(--red); color: var(--red); background: var(--red-soft); border-style: solid; }
+
+/* 삽입 존 */
+.ig-insert-zone {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 0; margin: 2px 0;
+}
+.iz-line { flex: 1; height: 1px; background: var(--border); }
+.iz-btns { display: flex; gap: 8px; flex-shrink: 0; }
+.btn-iz {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 16px; border: 1.5px solid var(--border);
+  border-radius: 8px; background: var(--surface2);
+  color: var(--text-soft); font-size: 12px; font-family: inherit;
+  font-weight: 500; cursor: pointer; transition: all .14s; white-space: nowrap;
+}
+.btn-iz:hover { border-color: var(--purple); color: var(--purple); background: var(--purple-soft); border-style: solid; }
+.btn-iz.btn-iz-banner { border-color: #93c5fd; border-style: dashed; color: #3b82f6; background: #eff6ff; }
+.btn-iz.btn-iz-banner:hover { border-color: #2563eb; color: #2563eb; background: #dbeafe; border-style: solid; }
+
+/* 이미지 아이템 */
+.ig-img-preview { max-width: 140px; max-height: 110px; border-radius: 6px; object-fit: cover; display: block; margin-bottom: 6px; }
+.ig-link-input {
+  width: 100%; padding: 5px 10px; font-size: 12px; font-family: inherit;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); color: var(--text); margin-bottom: 4px;
+}
+.ig-link-input:focus { outline: none; border-color: var(--purple); }
+
+/* 배너 아이템 */
+.ig-banner-preview { border-radius: 10px; padding: 14px 20px; text-align: center; font-weight: 700; font-size: 16px; word-break: break-word; }
+
+/* ── 이미지 모달 ── */
+.ig-modal-overlay {
+  position: fixed; inset: 0; z-index: 2000;
+  background: rgba(0,0,0,.45); display: none;
+  align-items: center; justify-content: center;
+}
+.ig-modal-overlay.show { display: flex; }
+.ig-modal-box {
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow-lg); padding: 24px;
+  width: min(480px, 92vw); max-height: 80vh; overflow-y: auto;
+}
+.ig-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.ig-modal-head h3 { font-size: 16px; font-weight: 700; }
+.btn-modal-close {
+  background: none; border: none; cursor: pointer;
+  font-size: 18px; color: var(--text-muted); padding: 2px 6px;
+}
+.btn-modal-close:hover { color: var(--text); }
+.ig-modal-section { margin-bottom: 16px; }
+.ig-modal-section label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-soft); }
+.ig-modal-input {
+  width: 100%; padding: 10px 14px; font-size: 14px; font-family: inherit;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface2); color: var(--text);
+}
+.ig-modal-input:focus { outline: none; border-color: var(--purple); }
+.ig-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.btn-modal-cancel { padding: 9px 20px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--surface2); color: var(--text-soft); font-size: 14px; font-family: inherit; cursor: pointer; }
+.btn-modal-ok { padding: 9px 20px; border: none; border-radius: var(--radius-sm); background: var(--grad); color: #fff; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; }
+.ig-upload-area {
+  border: 2px dashed var(--border); border-radius: var(--radius-sm);
+  padding: 20px; text-align: center; cursor: pointer;
+  color: var(--text-muted); font-size: 13px; transition: all .15s;
+}
+.ig-upload-area:hover { border-color: var(--purple); color: var(--purple); background: var(--purple-soft); }
+
+/* ── 배너 모달 ── */
+.bn-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.bn-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 120px; }
+.bn-field label { font-size: 12px; font-weight: 600; color: var(--text-soft); }
+.bn-field input[type=text], .bn-field textarea {
+  padding: 8px 10px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 13px; font-family: inherit; background: var(--surface2); color: var(--text);
+}
+.bn-field input[type=text]:focus, .bn-field textarea:focus { outline: none; border-color: var(--purple); }
+.bn-field input[type=color] { width: 48px; height: 34px; border: 1.5px solid var(--border); border-radius: 6px; cursor: pointer; padding: 2px; background: var(--surface2); }
+.bn-preview-label { font-size: 12px; font-weight: 600; color: var(--text-soft); margin-bottom: 8px; }
+/* 배너 스타일 버튼 */
+.bn-style-btn {
+  width: 32px; height: 32px; border: 1.5px solid var(--border);
+  border-radius: 6px; background: var(--surface2); color: var(--text-soft);
+  font-size: 14px; cursor: pointer; transition: all .14s;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.bn-style-btn.active { border-color: var(--purple); background: var(--purple-soft); color: var(--purple); }
+/* 이미지 검색 결과 */
+.ig-search-thumb {
+  position: relative; cursor: pointer; border-radius: 8px;
+  overflow: hidden; aspect-ratio: 1; background: var(--surface2);
+  border: 2.5px solid transparent; transition: border-color .14s;
+}
+.ig-search-thumb:hover { border-color: var(--purple); }
+.ig-search-thumb.selected { border-color: var(--purple); }
+.ig-search-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ig-search-check {
+  position: absolute; top: 6px; right: 6px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--purple); color: #fff;
+  display: none; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+}
+.ig-search-thumb.selected .ig-search-check { display: flex; }
+
+/* ── 카드뉴스 탭 ─────────────────────────────────────────────────── */
+.cn-toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:14px 16px; background:var(--surface2); border-bottom:1px solid var(--border); }
+.cn-style-btn { padding:6px 14px; border-radius:20px; border:1.5px solid var(--border); background:var(--surface3); color:var(--text-soft); font-size:13px; cursor:pointer; transition:all .14s; }
+.cn-style-btn.active { border-color:var(--purple); background:var(--purple-soft); color:var(--purple); font-weight:600; }
+.cn-slides { display:flex; flex-direction:column; gap:16px; padding:16px; }
+.cn-slide-card { background:var(--surface2); border:1.5px solid var(--border); border-radius:12px; overflow:hidden; }
+.cn-slide-header { display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--surface3); border-bottom:1px solid var(--border); }
+.cn-slide-num { width:28px; height:28px; border-radius:50%; background:var(--purple); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.cn-slide-title { font-weight:600; font-size:14px; flex:1; }
+.cn-slide-body { display:grid; grid-template-columns:1fr 1fr; gap:0; }
+@media(max-width:640px){ .cn-slide-body { grid-template-columns:1fr; } }
+.cn-slide-left { padding:14px; border-right:1px solid var(--border); }
+.cn-slide-right { padding:14px; display:flex; flex-direction:column; gap:8px; }
+.cn-slide-text-label { font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px; }
+.cn-slide-text { font-size:13px; color:var(--text-soft); line-height:1.6; }
+.cn-prompt-input { width:100%; box-sizing:border-box; font-size:12px; padding:8px 10px; border:1.5px solid var(--border); border-radius:8px; background:var(--surface3); color:var(--text); resize:vertical; min-height:72px; font-family:inherit; line-height:1.5; }
+.cn-prompt-input:focus { outline:none; border-color:var(--purple); }
+.cn-gen-btn { padding:8px 16px; border-radius:8px; border:none; background:var(--purple); color:#fff; font-size:13px; font-weight:600; cursor:pointer; transition:opacity .14s; display:flex; align-items:center; gap:6px; width:100%; justify-content:center; }
+.cn-gen-btn:hover { opacity:.85; }
+.cn-gen-btn:disabled { opacity:.45; cursor:not-allowed; }
+.cn-img-wrap { border-radius:8px; overflow:hidden; background:var(--surface3); aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--text-muted); position:relative; }
+.cn-img-wrap img { width:100%; height:100%; object-fit:cover; display:block; }
+/* ── 인터랙티브 캔버스 에디터 ── */
+.cn-canvas-editor {
+  container-type: size;
+  position: relative; aspect-ratio: 1; overflow: hidden;
+  border-radius: 8px; background: #000; width: 100%;
+}
+.cn-canvas-bg { width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; user-select:none; }
+.cn-canvas-grad {
+  position:absolute; inset:0; pointer-events:none;
+  background: linear-gradient(to bottom, transparent 38%, rgba(0,0,0,0.55) 65%, rgba(0,0,0,0.88) 100%);
+}
+.cn-slide-badge-ol {
+  position:absolute; top:2.6%; left:2.6%; width:6.7%; aspect-ratio:1;
+  background:rgba(138,43,226,.92); border-radius:11%;
+  display:flex; align-items:center; justify-content:center;
+  color:#fff; font-weight:700; font-size:3.5cqw; pointer-events:none; z-index:5;
+}
+.cn-text-ol {
+  position:absolute; transform:translateX(-50%);
+  white-space:nowrap; cursor:grab; user-select:none; -webkit-user-select:none;
+  text-align:center; z-index:10; line-height:1.2;
+  border-radius:4px; padding:2px 4px;
+  transition: outline .1s;
+}
+.cn-text-ol:active { cursor:grabbing; }
+.cn-text-ol.cn-selected { outline:2px dashed rgba(255,255,255,.85); outline-offset:5px; }
+.cn-text-ol.cn-editing {
+  cursor:text; user-select:text; -webkit-user-select:text;
+  outline:2px solid rgba(138,43,226,.95); outline-offset:5px;
+}
+/* 플로팅 툴바 */
+.cn-float-toolbar {
+  position:absolute; left:50%; transform:translateX(-50%); top:4%;
+  background:rgba(15,15,15,.95); border:1px solid rgba(255,255,255,.15);
+  border-radius:10px; padding:6px 10px;
+  display:none; align-items:center; gap:6px; flex-wrap:wrap;
+  z-index:25; backdrop-filter:blur(10px);
+  box-shadow:0 4px 20px rgba(0,0,0,.6); max-width:92%;
+}
+.cn-tb-label { font-size:10px; color:#aaa; white-space:nowrap; }
+.cn-tb-color { width:26px; height:24px; border:1.5px solid rgba(255,255,255,.25); border-radius:5px; cursor:pointer; padding:1px; background:transparent; flex-shrink:0; }
+.cn-tb-range { width:62px; accent-color:#a855f7; flex-shrink:0; cursor:pointer; }
+.cn-tb-val { font-size:11px; color:#ccc; min-width:28px; }
+.cn-tb-btn { padding:3px 9px; border-radius:5px; border:1px solid rgba(255,255,255,.2); background:rgba(255,255,255,.08); color:#ccc; font-size:13px; font-weight:700; cursor:pointer; transition:all .12s; line-height:1.4; }
+.cn-tb-btn:hover { background:rgba(255,255,255,.18); }
+.cn-tb-btn.active { background:rgba(138,43,226,.75); border-color:rgba(138,43,226,.9); color:#fff; }
+.cn-tb-sep { width:1px; height:18px; background:rgba(255,255,255,.15); flex-shrink:0; }
+/* ── 텍스트 스타일 에디터 ── */
+.cn-text-editor { margin-top:10px; border:1.5px solid var(--border); border-radius:10px; overflow:hidden; }
+.cn-text-editor summary { padding:7px 12px; font-size:12px; font-weight:700; color:var(--text-soft); cursor:pointer; background:var(--surface3); user-select:none; list-style:none; display:flex; align-items:center; gap:6px; }
+.cn-text-editor summary::-webkit-details-marker { display:none; }
+.cn-text-editor[open] summary::before { content:'▼ '; font-size:10px; }
+.cn-text-editor:not([open]) summary::before { content:'▶ '; font-size:10px; }
+.cn-editor-row { display:flex; align-items:center; gap:6px; padding:8px 12px; border-top:1px solid var(--border); flex-wrap:wrap; }
+.cn-editor-lbl { font-size:11px; font-weight:700; color:var(--purple); min-width:26px; }
+.cn-color-pick { width:30px; height:26px; border:1.5px solid var(--border); border-radius:5px; cursor:pointer; padding:2px; background:var(--surface3); flex-shrink:0; }
+.cn-size-range { width:70px; accent-color:var(--purple); flex-shrink:0; }
+.cn-size-val { font-size:11px; min-width:26px; color:var(--text-muted); }
+.cn-pos-range { width:90px; accent-color:var(--pink); flex-shrink:0; }
+.cn-pos-val { font-size:11px; min-width:30px; color:var(--text-muted); }
+.cn-check-lbl { display:flex; align-items:center; gap:3px; font-size:12px; color:var(--text-soft); cursor:pointer; user-select:none; }
+.cn-editor-divider { width:1px; height:18px; background:var(--border); flex-shrink:0; }
+.cn-img-loading { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; background:var(--surface3); font-size:12px; color:var(--text-muted); }
+.cn-spinner { width:28px; height:28px; border:3px solid var(--border); border-top-color:var(--purple); border-radius:50%; animation:spin .7s linear infinite; }
+.cn-gen-all-btn { width:100%; padding:12px; border-radius:10px; border:none; background:linear-gradient(135deg,var(--purple),var(--accent)); color:#fff; font-size:15px; font-weight:700; cursor:pointer; transition:opacity .14s; margin-bottom:12px; }
+.cn-gen-all-btn:hover { opacity:.88; }
+.cn-gen-all-btn:disabled { opacity:.45; cursor:not-allowed; }
+.cn-dl-btn { padding:6px 12px; border-radius:8px; border:1.5px solid var(--border); background:var(--surface2); color:var(--text-soft); font-size:12px; cursor:pointer; }
+.cn-dl-btn:hover { border-color:var(--purple); color:var(--purple); }
+.cn-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:60px 20px; color:var(--text-muted); font-size:14px; }
+.cn-empty-icon { font-size:48px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">📸</div>
+      인스타그램 파이프라인
+    </div>
+    <div class="header-actions">
+      <button class="btn-settings" onclick="openSettings()">⚙️ API 키</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- 네트워크 바 -->
+  <div class="network-bar" id="networkBar">
+    <span>📱 핸드폰 접속:</span>
+    <span class="network-url" id="networkUrl" onclick="copyNetworkUrl()">로딩 중...</span>
+    <span class="network-badge" id="networkBadge">로컬</span>
+    <span id="networkHint" style="color:var(--text-muted)"></span>
+  </div>
+
+  <!-- Input Card -->
+  <div class="input-card">
+    <h2>📸 인스타그램 글쓰기</h2>
+
+    <div style="margin-bottom:14px">
+      <label class="form-group" style="display:block;margin-bottom:6px">
+        <span class="modal-label" style="display:inline">포스트 타입</span>
+      </label>
+      <div class="post-type-tabs">
+        <button class="post-type-btn active" onclick="setPostType(this,'단일 포스트')">📷 단일 포스트</button>
+        <button class="post-type-btn" onclick="setPostType(this,'캐러셀')">🎠 캐러셀</button>
+        <button class="post-type-btn" onclick="setPostType(this,'릴스 스크립트')">🎬 릴스 스크립트</button>
+      </div>
+      <div id="slide-count-row" class="slide-count-row hidden">
+        슬라이드 수:
+        <input type="range" id="slide-count" min="5" max="8" value="6"
+          oninput="document.getElementById('slide-count-val').textContent=this.value;updatePostType()">
+        <span class="slide-count-val" id="slide-count-val">6</span>장
+        <span style="font-size:11px;color:var(--text-muted);margin-left:4px">(최대 8장)</span>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group" style="flex:2">
+        <label>주제 / 키워드</label>
+        <textarea id="topic" rows="2" placeholder="예: 이사할 때 주의할 점, 퇴근 후 자기계발 루틴, 다이어트 없이 건강해지는 법"></textarea>
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <button class="suggest-btn" id="btn-suggest" onclick="suggestTopics()">
+        🔥 떡상 주제 10개 추천
+      </button>
+    </div>
+    <div class="suggest-panel" id="suggest-panel">
+      <div class="suggest-panel-title">✨ 클릭해서 주제 선택</div>
+      <div class="suggest-chips" id="suggest-chips"></div>
+    </div>
+
+    <details style="margin:14px 0">
+      <summary style="font-size:13px;color:var(--text-soft);cursor:pointer;user-select:none">
+        ▶ 계정 스타일 가이드 (선택사항)
+      </summary>
+      <div style="margin-top:10px">
+        <textarea id="style" rows="2"
+          placeholder="예: 20대 여성 타겟, 친근하고 유머러스한 톤, 이모지 많이 사용, 해시태그 첫 댓글에 배치"></textarea>
+      </div>
+    </details>
+
+    <div class="flex-gap">
+      <button class="btn-run" id="btn-start" onclick="startPipeline()">✨ 콘텐츠 생성</button>
+      <button class="btn-secondary hidden" id="btn-resume" onclick="resumePipeline()">▶ 이어서 생성</button>
+      <button class="btn-secondary hidden" id="btn-reset" onclick="resetAll()">🔄 처음부터</button>
+    </div>
+  </div>
+
+  <!-- Pipeline Stages -->
+  <div class="pipeline-label">🔄 파이프라인</div>
+  <div class="pipeline" id="pipeline">
+    <div class="stage-card" id="card-researcher">
+      <div class="stage-icon">🔍</div>
+      <div class="stage-name">Researcher</div>
+      <div class="stage-desc">주제 & 타겟 분석</div>
+      <span class="stage-status" id="status-researcher">대기</span>
+      <div class="stage-errmsg hidden" id="errmsg-researcher"></div>
+      <button class="stage-retry-btn hidden" id="retry-researcher" onclick="retryFrom('researcher')">↺ 여기서 재시도</button>
+      <div class="stage-progress"><div class="stage-progress-bar" id="prog-researcher"></div></div>
+    </div>
+    <div class="stage-card" id="card-planner">
+      <div class="stage-icon">📋</div>
+      <div class="stage-name">Planner</div>
+      <div class="stage-desc">포스트 구조 설계</div>
+      <span class="stage-status" id="status-planner">대기</span>
+      <div class="stage-errmsg hidden" id="errmsg-planner"></div>
+      <button class="stage-retry-btn hidden" id="retry-planner" onclick="retryFrom('planner')">↺ 여기서 재시도</button>
+      <div class="stage-progress"><div class="stage-progress-bar" id="prog-planner"></div></div>
+    </div>
+    <div class="stage-card" id="card-writer">
+      <div class="stage-icon">✍️</div>
+      <div class="stage-name">Writer</div>
+      <div class="stage-desc">캡션 & 슬라이드 작성</div>
+      <span class="stage-status" id="status-writer">대기</span>
+      <div class="stage-errmsg hidden" id="errmsg-writer"></div>
+      <button class="stage-retry-btn hidden" id="retry-writer" onclick="retryFrom('writer')">↺ 여기서 재시도</button>
+      <div class="stage-progress"><div class="stage-progress-bar" id="prog-writer"></div></div>
+    </div>
+    <div class="stage-card" id="card-reviewer">
+      <div class="stage-icon">✅</div>
+      <div class="stage-name">Reviewer</div>
+      <div class="stage-desc">검토 & 완성</div>
+      <span class="stage-status" id="status-reviewer">대기</span>
+      <div class="stage-errmsg hidden" id="errmsg-reviewer"></div>
+      <button class="stage-retry-btn hidden" id="retry-reviewer" onclick="retryFrom('reviewer')">↺ 여기서 재시도</button>
+      <div class="stage-progress"><div class="stage-progress-bar" id="prog-reviewer"></div></div>
+    </div>
+    <div class="stage-card" id="card-publisher">
+      <div class="stage-icon">📤</div>
+      <div class="stage-name">Publisher</div>
+      <div class="stage-desc">해시태그 & 게시 패키지</div>
+      <span class="stage-status" id="status-publisher">대기</span>
+      <div class="stage-errmsg hidden" id="errmsg-publisher"></div>
+      <button class="stage-retry-btn hidden" id="retry-publisher" onclick="retryFrom('publisher')">↺ 여기서 재시도</button>
+      <div class="stage-progress"><div class="stage-progress-bar" id="prog-publisher"></div></div>
+    </div>
+  </div>
+
+  <!-- Output Area -->
+  <div class="output-section">
+    <div class="output-tabs">
+      <button class="output-tab active" id="tab-researcher" onclick="switchTab('researcher')">🔍 Researcher</button>
+      <button class="output-tab" id="tab-planner" onclick="switchTab('planner')">📋 Planner</button>
+      <button class="output-tab" id="tab-writer" onclick="switchTab('writer')">✍️ Writer</button>
+      <button class="output-tab" id="tab-reviewer" onclick="switchTab('reviewer')">✅ Reviewer</button>
+      <button class="output-tab" id="tab-publisher" onclick="switchTab('publisher')">📤 Publisher</button>
+      <button class="output-tab" id="tab-cardnews" onclick="switchTab('cardnews')">🖼️ 카드뉴스</button>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px;padding:0 12px">
+        <button class="btn-copy" id="btn-copy-tab" onclick="copyCurrentTab()" style="display:none;font-size:12px;padding:5px 12px">📋 복사</button>
+      </div>
+    </div>
+    <div class="output-body" id="output-body">
+      <div class="output-empty">
+        <div class="empty-icon">✨</div>
+        <div>주제를 입력하고 <strong>콘텐츠 생성</strong>을 누르면 AI가 인스타그램 포스트를 작성해드립니다.</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- IG Image Search Modal -->
+<div class="ig-modal-overlay" id="ig-img-modal" onclick="if(event.target===this)closeIgImgModal()">
+  <div class="ig-modal-box" style="width:min(600px,94vw);max-height:88vh">
+    <div class="ig-modal-head">
+      <h3>📷 이미지 검색</h3>
+      <button class="btn-modal-close" onclick="closeIgImgModal()">✕</button>
+    </div>
+
+    <!-- 검색바 -->
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input type="text" id="ig-search-query" class="ig-modal-input" placeholder="검색어 입력 (예: 이사, 냉장고, 인테리어)"
+             onkeydown="if(event.key==='Enter')doNaverSearch()" style="flex:1">
+      <button class="btn-modal-ok" onclick="doNaverSearch()" style="white-space:nowrap;padding:10px 16px">🔍 검색</button>
+    </div>
+
+    <!-- 검색 결과 그리드 -->
+    <div id="ig-search-results" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;min-height:180px;margin-bottom:12px">
+      <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px">
+        검색어를 입력하고 🔍 버튼을 누르세요
+      </div>
+    </div>
+
+    <!-- 선택 확인 바 -->
+    <div id="ig-select-bar" style="display:none;padding:8px 12px;background:var(--purple-soft);border-radius:8px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+      <span id="ig-select-count" style="font-size:13px;font-weight:700;color:var(--purple)">0장 선택됨</span>
+      <button class="btn-modal-ok" onclick="confirmIgSelection()" style="padding:6px 16px;font-size:13px">✅ 선택한 이미지 추가</button>
+    </div>
+
+    <!-- URL 직접 입력 -->
+    <div style="border-top:1px solid var(--border);padding-top:12px;display:flex;gap:8px">
+      <input type="url" id="ig-img-url" class="ig-modal-input" placeholder="또는 이미지 URL 직접 붙여넣기"
+             onkeydown="if(event.key==='Enter')addIgImageByUrl()" style="flex:1;font-size:13px">
+      <button class="btn-modal-ok" onclick="addIgImageByUrl()" style="white-space:nowrap;padding:10px 14px;font-size:13px">URL 추가</button>
+      <button class="btn-modal-cancel" onclick="document.getElementById('ig-file-input').click()" style="white-space:nowrap;font-size:13px">📁 파일</button>
+    </div>
+    <input type="file" id="ig-file-input" accept="image/*" multiple style="display:none" onchange="handleIgFileUpload(this)">
+  </div>
+</div>
+
+<!-- IG Banner Modal -->
+<div class="ig-modal-overlay" id="ig-banner-modal" onclick="if(event.target===this)closeIgBannerModal()">
+  <div class="ig-modal-box" style="width:min(560px,94vw);max-height:90vh;overflow-y:auto">
+    <div class="ig-modal-head">
+      <h3>🎨 배너 만들기</h3>
+      <button class="btn-modal-close" onclick="closeIgBannerModal()">✕</button>
+    </div>
+
+    <!-- 텍스트 -->
+    <div class="ig-modal-section">
+      <label>배너 텍스트</label>
+      <textarea id="bn-text" class="ig-modal-input" rows="2" placeholder="배너에 들어갈 텍스트 입력" oninput="updateIgBannerPreview()" style="resize:vertical"></textarea>
+    </div>
+
+    <!-- 텍스트 스타일 -->
+    <div class="ig-modal-section">
+      <label>텍스트 스타일</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button id="bn-bold" class="bn-style-btn active" onclick="toggleBnStyle('bold')" title="굵게"><b>B</b></button>
+        <button id="bn-italic" class="bn-style-btn" onclick="toggleBnStyle('italic')" title="기울기"><i>I</i></button>
+        <button id="bn-underline" class="bn-style-btn" onclick="toggleBnStyle('underline')" title="밑줄"><u>U</u></button>
+        <button id="bn-shadow" class="bn-style-btn" onclick="toggleBnStyle('shadow')" title="그림자">S̲h</button>
+        <div style="display:flex;align-items:center;gap:6px;margin-left:4px">
+          <span style="font-size:12px;color:var(--text-muted)">크기</span>
+          <input type="range" id="bn-size" min="12" max="48" value="20" oninput="document.getElementById('bn-size-val').textContent=this.value+'px';updateIgBannerPreview()" style="width:80px">
+          <span id="bn-size-val" style="font-size:12px;min-width:28px;color:var(--text-soft)">20px</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:12px;color:var(--text-muted)">자간</span>
+          <input type="range" id="bn-ls" min="-2" max="10" value="0" oninput="document.getElementById('bn-ls-val').textContent=this.value;updateIgBannerPreview()" style="width:60px">
+          <span id="bn-ls-val" style="font-size:12px;min-width:16px;color:var(--text-soft)">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 색상 -->
+    <div class="bn-row">
+      <div class="bn-field">
+        <label>배경색 1</label>
+        <input type="color" id="bn-c1" value="#833AB4" oninput="updateIgBannerPreview()">
+      </div>
+      <div class="bn-field">
+        <label>배경색 2</label>
+        <input type="color" id="bn-c2" value="#E1306C" oninput="updateIgBannerPreview()">
+      </div>
+      <div class="bn-field">
+        <label>글자색</label>
+        <input type="color" id="bn-tc" value="#ffffff" oninput="updateIgBannerPreview()">
+      </div>
+      <div class="bn-field">
+        <label>그라디언트</label>
+        <select id="bn-grad-dir" class="ig-modal-input" style="padding:6px 8px;font-size:12px" onchange="updateIgBannerPreview()">
+          <option value="135deg">↘ 대각선</option>
+          <option value="to right">→ 가로</option>
+          <option value="to bottom">↓ 세로</option>
+          <option value="none">단색</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 링크 -->
+    <div class="ig-modal-section">
+      <label>링크 URL (배너 클릭 시 이동)</label>
+      <input type="url" id="bn-link" class="ig-modal-input" placeholder="https://...">
+    </div>
+
+    <!-- 미리보기 -->
+    <div class="bn-preview-label">👁️ 미리보기</div>
+    <div id="ig-banner-live" style="border-radius:10px;padding:16px 24px;text-align:center;font-weight:700;font-size:20px;color:#fff;background:linear-gradient(135deg,#833AB4,#E1306C);word-break:break-word;margin-bottom:12px;cursor:pointer">배너 텍스트를 입력하세요</div>
+
+    <div class="ig-modal-actions">
+      <button class="btn-modal-cancel" onclick="closeIgBannerModal()">취소</button>
+      <button class="btn-modal-ok" onclick="saveIgBanner()">💾 저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay hidden" id="settings-modal" onclick="closeSettingsOutside(event)">
+  <div class="modal">
+    <h3>⚙️ 설정</h3>
+    <p class="modal-sub">API 키는 브라우저 로컬 스토리지에만 저장됩니다.</p>
+
+    <!-- 무료 API 옵션 안내 -->
+    <div style="background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(168,85,247,.12));border:1px solid rgba(99,102,241,.3);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;line-height:1.7">
+      <strong>🆓 무료로 사용하는 방법</strong><br>
+      <span style="opacity:.85">
+        ① <strong>Groq (추천 ⭐)</strong> — <a href="https://console.groq.com/keys" target="_blank" style="color:#818cf8">console.groq.com</a> 무료 가입 → <code>gsk_...</code> 형식 입력 (크레딧 없음·완전무료)<br>
+        ② <strong>Google Gemini</strong> — <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#818cf8">aistudio.google.com</a> 에서 무료 API 키 발급 → <code>AIza...</code> 형식 입력 (무료 한도 있음)<br>
+        ③ <strong>완전 무료 (키 불필요)</strong> — 입력란을 비워두거나 <code>free</code> 입력 (Pollinations.ai 사용, 품질 보통)
+      </span>
+    </div>
+
+    <label class="modal-label">API 키 <span id="provider-badge" style="margin-left:6px;font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px;background:rgba(99,102,241,.15);color:#818cf8"></span></label>
+    <input type="text" id="api-key-input" placeholder="AIza... / gsk_... / sk-ant-... / 비워두면 무료" style="margin-bottom:4px" oninput="updateProviderBadge()">
+    <p class="modal-hint" id="api-hint">
+      키를 입력하지 않으면 Pollinations.ai(무료)로 자동 실행됩니다
+    </p>
+
+    <label class="modal-label" style="margin-top:4px">AI 모델 선택 <span style="font-size:11px;color:#9ca3af">(Anthropic 키 사용 시)</span></label>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+      <select id="model-select" class="modal-select" style="flex:1">
+        <option value="claude-sonnet-4-5">Claude Sonnet 4.5 (권장)</option>
+        <option value="claude-opus-5-20251101">Claude Opus 5 (최강)</option>
+        <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (빠름·경제적)</option>
+        <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+        <option value="claude-haiku-3-5-20241022">Claude Haiku 3.5</option>
+      </select>
+      <button class="btn-secondary btn-check" onclick="loadModels()">🔍 조회</button>
+    </div>
+    <p class="modal-hint" id="model-hint" style="margin-bottom:16px"></p>
+
+    <label class="modal-label">네이버 Client ID (이미지 검색용)</label>
+    <input type="text" id="naver-id-input" placeholder="네이버 Client ID" style="margin-bottom:4px">
+    <label class="modal-label" style="margin-top:8px">네이버 Client Secret</label>
+    <input type="password" id="naver-secret-input" placeholder="네이버 Client Secret" style="margin-bottom:4px">
+    <p class="modal-hint" style="margin-bottom:16px">
+      <a href="https://developers.naver.com/apps/" target="_blank">네이버 개발자센터</a> → 애플리케이션 등록 → 검색(이미지) 권한
+    </p>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeSettings()">취소</button>
+      <button class="btn-run" onclick="saveSettings()">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── State ──────────────────────────────────────────────────────────────────
+
+let apiKey = '';
+let currentModel = 'claude-sonnet-4-5';
+let currentJobId = null;
+let stageOutputs = {};
+let activeTab = 'researcher';
+let es = null;
+let currentPostType = '단일 포스트';
+let completedStages = new Set();
+let naverClientId = '';
+let naverClientSecret = '';
+
+const STAGES = ['researcher', 'planner', 'writer', 'reviewer', 'publisher'];
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+
+(function init() {
+  apiKey = localStorage.getItem('ig_apiKey') || '';
+  const storedModel = localStorage.getItem('ig_model') || '';
+  // Gemini 모델이 저장돼 있으면 Claude 기본값으로 리셋
+  currentModel = (storedModel && !storedModel.startsWith('gemini'))
+    ? storedModel : 'claude-sonnet-4-5';
+  localStorage.setItem('ig_model', currentModel);
+  naverClientId = localStorage.getItem('ig_naver_id') || '';
+  naverClientSecret = localStorage.getItem('ig_naver_secret') || '';
+  if (!apiKey) setTimeout(() => openSettings(), 400);
+  loadNetworkInfo();
+})();
+
+// ─── Suggest Topics ──────────────────────────────────────────────────────────
+
+async function suggestTopics() {
+  const btn = document.getElementById('btn-suggest');
+  const panel = document.getElementById('suggest-panel');
+  const chips = document.getElementById('suggest-chips');
+
+  // API 키 검증 — 비어 있으면 무료 모드
+  if (false && !apiKey) { // 검증 비활성화 — 빈 키 = Pollinations 무료 모드
+    panel.classList.add('show');
+    chips.innerHTML = `<div class="suggest-err-box">
+      ⚠️ <strong>Anthropic API 키가 필요합니다.</strong><br>
+      <span style="font-size:12px;opacity:.8">sk-ant-... 형식의 키를 설정창에 입력해주세요.</span>
+    </div>`;
+    setTimeout(() => openSettings(), 300);
+    return;
+  }
+
+  const topic = document.getElementById('topic').value.trim();
+  btn.disabled = true;
+  btn.textContent = '⏳ 생성 중...';
+  panel.classList.add('show');
+  chips.innerHTML = '<div class="suggest-loading">🔥 조회수 폭발할 주제 분석 중...</div>';
+
+  try {
+    const r = await fetch('/api/pipeline/suggest-topics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, apiKey, postType: currentPostType })
+    });
+    const data = await r.json();
+    if (!r.ok || data.error) {
+      const raw = data.error || `HTTP ${r.status}`;
+      // Anthropic 에러 JSON 안에서 핵심 메시지 추출
+      let msg = raw;
+      try { const parsed = JSON.parse(raw.replace(/^\d+\s*/,'')); msg = parsed?.error?.message || raw; } catch(_){}
+      const isAuthErr = r.status === 401 || /authentication|api.?key|invalid/i.test(raw);
+      chips.innerHTML = `<div class="suggest-err-box">
+        ⚠️ <strong>${isAuthErr ? 'API 키 오류' : '요청 실패'}</strong><br>
+        <span style="font-size:12px;opacity:.85">${escHtml(msg)}</span>
+        ${isAuthErr ? '<br><span style="font-size:12px">⚙️ 설정에서 API 키를 확인해주세요.</span>' : ''}
+      </div>`;
+      if (isAuthErr) setTimeout(() => openSettings(), 600);
+      return;
+    }
+    const topics = data.topics;
+    chips.innerHTML = topics.map((t, i) =>
+      `<button class="suggest-chip" onclick="selectTopic(this, '${escapeJs(t)}')">${i + 1}. ${escHtml(t)}</button>`
+    ).join('');
+  } catch (err) {
+    chips.innerHTML = `<div class="suggest-err-box">⚠️ <strong>네트워크 오류</strong><br><span style="font-size:12px;opacity:.85">${escHtml(err.message)}</span></div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🔥 떡상 주제 10개 추천';
+  }
+}
+
+function selectTopic(btn, topic) {
+  // Deselect others
+  document.querySelectorAll('.suggest-chip').forEach(c => c.classList.remove('selected'));
+  btn.classList.add('selected');
+  // Fill topic input
+  document.getElementById('topic').value = topic;
+  // Scroll to start button
+  document.getElementById('btn-start').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ─── Post Type ───────────────────────────────────────────────────────────────
+
+function setPostType(btn, type) {
+  document.querySelectorAll('.post-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const slideRow = document.getElementById('slide-count-row');
+  if (type === '캐러셀') {
+    slideRow.classList.remove('hidden');
+    currentPostType = `캐러셀 ${document.getElementById('slide-count').value}장`;
+  } else {
+    slideRow.classList.add('hidden');
+    currentPostType = type;
+  }
+}
+
+function updatePostType() {
+  const n = document.getElementById('slide-count').value;
+  currentPostType = `캐러셀 ${n}장`;
+}
+
+// ─── Pipeline ────────────────────────────────────────────────────────────────
+
+function startPipeline(startFrom = null, previousOutputs = null) {
+  const topic = document.getElementById('topic').value.trim();
+  if (!topic) { alert('주제를 입력해주세요.'); return; }
+  if (!apiKey) { openSettings(); return; }
+
+  currentJobId = null;
+  if (!startFrom) {
+    stageOutputs = {};
+    completedStages.clear();
+    resetStageCards();
+  }
+
+  document.getElementById('btn-start').disabled = true;
+  document.getElementById('btn-resume').classList.add('hidden');
+
+  fetch('/api/pipeline/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      topic,
+      apiKey,
+      style: document.getElementById('style').value.trim(),
+      postType: currentPostType,
+      previousOutputs: previousOutputs || stageOutputs,
+      startFrom
+    })
+  })
+  .then(r => r.json())
+  .then(({ jobId }) => {
+    currentJobId = jobId;
+    listenToStream(jobId);
+  })
+  .catch(err => {
+    alert('서버 오류: ' + err.message);
+    document.getElementById('btn-start').disabled = false;
+  });
+}
+
+function resumePipeline() {
+  // Find first incomplete stage
+  const firstIncomplete = STAGES.find(s => !completedStages.has(s));
+  if (!firstIncomplete) { resetAll(); return; }
+  startPipeline(firstIncomplete, stageOutputs);
+}
+
+function retryFrom(stageId) {
+  startPipeline(stageId, stageOutputs);
+}
+
+function listenToStream(jobId) {
+  if (es) es.close();
+  es = new EventSource(`/api/pipeline/stream/${jobId}`);
+  es.onmessage = (e) => handleEvent(JSON.parse(e.data));
+  es.onerror = () => {
+    document.getElementById('btn-start').disabled = false;
+  };
+}
+
+function handleEvent(ev) {
+  switch (ev.type) {
+    case 'pipeline_start':
+      break;
+    case 'stage_start':
+      setStageStatus(ev.stage, 'running');
+      switchTab(ev.stage);
+      stageOutputs[ev.stage] = '';
+      renderOutput(ev.stage, '', true);
+      break;
+    case 'stage_skip':
+      stageOutputs[ev.stage] = ev.content;
+      completedStages.add(ev.stage);
+      setStageStatus(ev.stage, 'complete');
+      document.getElementById(`tab-${ev.stage}`).classList.add('done');
+      break;
+    case 'chunk':
+      stageOutputs[ev.stage] = (stageOutputs[ev.stage] || '') + ev.text;
+      renderOutput(ev.stage, stageOutputs[ev.stage], true);
+      break;
+    case 'stage_complete':
+      completedStages.add(ev.stage);
+      setStageStatus(ev.stage, 'complete');
+      document.getElementById(`tab-${ev.stage}`).classList.add('done');
+      renderOutput(ev.stage, stageOutputs[ev.stage], false);
+      break;
+    case 'stage_retry':
+      setStageStatus(ev.stage, 'running');
+      showStageError(ev.stage, `⏳ ${ev.message}`, false);
+      break;
+    case 'stage_error':
+      setStageStatus(ev.stage, 'error');
+      showStageError(ev.stage, ev.message, true);
+      document.getElementById('btn-start').disabled = false;
+      document.getElementById('btn-resume').classList.remove('hidden');
+      document.getElementById('btn-reset').classList.remove('hidden');
+      if (es) es.close();
+      break;
+    case 'pipeline_complete':
+      document.getElementById('btn-start').disabled = false;
+      document.getElementById('btn-reset').classList.remove('hidden');
+      igItemsInitialized = false; // 새 파이프라인 결과로 초기화
+      switchTab('publisher');
+      if (es) es.close();
+      break;
+  }
+}
+
+// ─── Stage Card UI ───────────────────────────────────────────────────────────
+
+function setStageStatus(stageId, status) {
+  const card = document.getElementById(`card-${stageId}`);
+  const badge = document.getElementById(`status-${stageId}`);
+  card.className = `stage-card ${status}`;
+  const labels = { running: '⚡ 작성 중', complete: '✓ 완료', error: '✗ 오류' };
+  badge.textContent = labels[status] || '대기';
+  badge.className = `stage-status ${status}`;
+  // progress bar animation
+  const bar = document.getElementById(`prog-${stageId}`);
+  if (status === 'running') { bar.style.width = '60%'; bar.style.transition = 'width 15s ease'; }
+  else if (status === 'complete') { bar.style.width = '100%'; bar.style.transition = 'width .3s'; }
+  else { bar.style.width = '0%'; }
+  // hide retry button on new run
+  if (status === 'running') {
+    document.getElementById(`retry-${stageId}`).classList.add('hidden');
+    const errmsg = document.getElementById(`errmsg-${stageId}`);
+    errmsg.classList.add('hidden');
+    errmsg.textContent = '';
+  }
+}
+
+function showStageError(stageId, msg, showRetry) {
+  const errmsg = document.getElementById(`errmsg-${stageId}`);
+  errmsg.textContent = msg;
+  errmsg.classList.remove('hidden');
+  if (showRetry) {
+    document.getElementById(`retry-${stageId}`).classList.remove('hidden');
+  }
+}
+
+function resetStageCards() {
+  STAGES.forEach(s => {
+    const card = document.getElementById(`card-${s}`);
+    card.className = 'stage-card';
+    document.getElementById(`status-${s}`).textContent = '대기';
+    document.getElementById(`status-${s}`).className = 'stage-status';
+    document.getElementById(`errmsg-${s}`).classList.add('hidden');
+    document.getElementById(`retry-${s}`).classList.add('hidden');
+    document.getElementById(`prog-${s}`).style.width = '0%';
+    document.getElementById(`tab-${s}`).classList.remove('done');
+  });
+}
+
+function resetAll() {
+  stageOutputs = {};
+  completedStages.clear();
+  resetStageCards();
+  document.getElementById('btn-start').disabled = false;
+  document.getElementById('btn-resume').classList.add('hidden');
+  document.getElementById('btn-reset').classList.add('hidden');
+  currentJobId = null;
+  igItems = [];
+  igItemsInitialized = false;
+  switchTab('researcher');
+  document.getElementById('output-body').innerHTML = `
+    <div class="output-empty">
+      <div class="empty-icon">✨</div>
+      <div>주제를 입력하고 <strong>콘텐츠 생성</strong>을 누르면 AI가 인스타그램 포스트를 작성해드립니다.</div>
+    </div>`;
+}
+
+// ─── Tab & Output ────────────────────────────────────────────────────────────
+
+function switchTab(stageId) {
+  activeTab = stageId;
+  const allTabs = [...STAGES, 'cardnews'];
+  allTabs.forEach(s => {
+    const el = document.getElementById(`tab-${s}`);
+    if (el) el.classList.toggle('active', s === stageId);
+  });
+
+  // 카드뉴스 탭 특별 처리
+  if (stageId === 'cardnews') {
+    document.getElementById('btn-copy-tab').style.display = 'none';
+    document.getElementById('output-body').innerHTML = renderCardNews();
+    return;
+  }
+
+  const content = stageOutputs[stageId];
+  const copyBtn = document.getElementById('btn-copy-tab');
+  if (!content) {
+    copyBtn.style.display = 'none';
+    document.getElementById('output-body').innerHTML = `
+      <div class="output-empty">
+        <div class="empty-icon">⏳</div>
+        <div>아직 작성되지 않았습니다.</div>
+      </div>`;
+  } else {
+    copyBtn.style.display = 'block';
+    copyBtn.textContent = '📋 복사';
+    copyBtn.classList.remove('copied');
+    renderOutput(stageId, content, false);
+  }
+}
+
+
+function copyCurrentTab() {
+  const content = stageOutputs[activeTab];
+  if (!content) return;
+  navigator.clipboard.writeText(content).then(() => {
+    const btn = document.getElementById('btn-copy-tab');
+    btn.textContent = '✓ 복사됨';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '📋 복사'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function renderOutput(stageId, content, streaming) {
+  if (activeTab !== stageId) return;
+  const body = document.getElementById('output-body');
+  const copyBtn = document.getElementById('btn-copy-tab');
+  if (content) {
+    copyBtn.style.display = 'block';
+  }
+  if (stageId === 'publisher' && !streaming) {
+    body.innerHTML = renderPublisher(content);
+  } else {
+    body.innerHTML = `<div class="md-output${streaming ? ' streaming-cursor' : ''}">${markdownToHtml(content)}</div>`;
+  }
+}
+
+// ─── Publisher Special Render ────────────────────────────────────────────────
+
+let igItemsInitialized = false;
+
+function renderPublisher(content) {
+  // Extract caption section
+  const captionMatch = content.match(/##\s*✅\s*최종 캡션[^\n]*\n([\s\S]*?)(?=\n---|\n##|$)/i);
+  const captionText = captionMatch ? captionMatch[1].trim() : '';
+
+  // Initialize igItems from caption (only once per pipeline run)
+  if (!igItemsInitialized && captionText) {
+    igItems = parseWriterToItems(captionText);
+    igItemsInitialized = true;
+  }
+
+  // Extract hashtag
+  const hashCombMatch = content.match(/\*\*🔖[^*]*\*\*[:\s]*\n([#\s\w가-힣ㄱ-ㅎㅏ-ㅣ]+)/);
+  const hashText = hashCombMatch ? hashCombMatch[1].trim() : '';
+
+  // Extract story version
+  const storyMatch = content.match(/##\s*📖[^\n]*\n([\s\S]*?)(?=\n##|$)/i);
+  const storyText = storyMatch ? storyMatch[1].trim() : '';
+
+  const captionLen = captionText.length;
+  const lenClass = captionLen > 2000 ? 'over' : captionLen > 1500 ? 'warn' : '';
+
+  // Build inline editor HTML for caption items
+  const captionEditorHtml = buildInlineCaptionHtml();
+
+  // Plain-text caption for copy button (text items only, no images/banners)
+  const plainCaption = igItems.filter(i => i.type === 'text').map(i => i.content).join('\n\n');
+
+  return `
+    <div class="publisher-output">
+      <div class="copy-block">
+        <div class="copy-block-header">
+          <span class="copy-block-title">✅ 최종 캡션</span>
+          <div class="copy-block-meta">
+            <span class="char-count ${lenClass}">${captionLen} / 2200자</span>
+            <button class="btn-copy" onclick="copyText(this, '${escapeJs(plainCaption)}')">📋 캡션 복사</button>
+          </div>
+        </div>
+        <div id="caption-inline-editor" style="padding:4px 0">
+          ${captionEditorHtml || `<div class="copy-block-body">${escHtml(captionText)}</div>`}
+        </div>
+      </div>
+
+      ${hashText ? `
+      <div class="copy-block">
+        <div class="copy-block-header">
+          <span class="copy-block-title">#️⃣ 해시태그 (댓글용)</span>
+          <div class="copy-block-meta">
+            <button class="btn-copy" onclick="copyText(this, '${escapeJs(hashText)}')">📋 복사</button>
+          </div>
+        </div>
+        <div class="copy-block-body">${escHtml(hashText)}</div>
+      </div>` : ''}
+
+      ${storyText ? `
+      <div class="copy-block">
+        <div class="copy-block-header">
+          <span class="copy-block-title">📖 스토리 버전</span>
+          <div class="copy-block-meta">
+            <button class="btn-copy" onclick="copyText(this, '${escapeJs(storyText)}')">📋 복사</button>
+          </div>
+        </div>
+        <div class="copy-block-body">${escHtml(storyText)}</div>
+      </div>` : ''}
+    </div>`;
+}
+
+function buildInlineCaptionHtml() {
+  if (!igItems.length) return '';
+  let html = _izHtml(-1);
+  igItems.forEach((item, idx) => {
+    html += _igItemHtml(item, idx);
+    html += _izHtml(idx);
+  });
+  return html;
+}
+
+function _izHtml(afterIdx) {
+  return `<div class="ig-insert-zone">
+    <span class="iz-line"></span>
+    <div class="iz-btns">
+      <button class="btn-iz" onclick="openIgImgModal(${afterIdx})">📷 이미지 추가</button>
+      <button class="btn-iz btn-iz-banner" onclick="openIgBannerModal(${afterIdx})">🎨 배너 추가</button>
+    </div>
+    <span class="iz-line"></span>
+  </div>`;
+}
+
+function _igItemHtml(item, idx) {
+  if (item.type === 'text') {
+    return `<div class="ig-inline-text">
+      <div class="ig-text-md">${markdownToHtml(item.content)}</div>
+      <button class="ic-btn ic-del" onclick="deleteIgItem(${idx})" style="margin-top:6px">✕ 삭제</button>
+    </div>`;
+  }
+  if (item.type === 'image') {
+    const url = item.url || '';
+    return `<div class="ig-inline-media">
+      <img src="${url}" style="max-width:100%;max-height:220px;border-radius:8px;object-fit:cover;display:block">
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
+        <input type="url" class="ig-link-input" style="flex:1;min-width:160px" placeholder="🔗 링크 URL (선택)"
+          value="${escHtml(item.link||'')}" oninput="igItems[${idx}].link=this.value">
+        <button class="ic-btn ic-del" onclick="deleteIgItem(${idx})">✕ 삭제</button>
+      </div>
+    </div>`;
+  }
+  if (item.type === 'banner') {
+    const bStyle = _buildBannerStyle(item);
+    const inner = `<div style="${bStyle}">${escHtml(item.text||'')}</div>`;
+    const bannerEl = item.link
+      ? `<a href="${escHtml(item.link)}" target="_blank" rel="noopener" style="text-decoration:none;display:block">${inner}</a>`
+      : inner;
+    return `<div class="ig-inline-media">
+      ${bannerEl}
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button class="ic-btn" onclick="editIgBanner(${idx})">✏️ 편집</button>
+        <button class="ic-btn ic-del" onclick="deleteIgItem(${idx})">✕ 삭제</button>
+      </div>
+    </div>`;
+  }
+  return '';
+}
+
+function copyText(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓ 복사됨';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function escapeJs(s) {
+  return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n').replace(/\r/g,'');
+}
+
+// ─── Markdown Parser ─────────────────────────────────────────────────────────
+
+function markdownToHtml(md) {
+  if (!md) return '';
+  let html = escHtml(md);
+  // headings
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  // bold/italic
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // code
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // blockquote
+  html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+  // hr
+  html = html.replace(/^---$/gm, '<hr>');
+  // bullet list
+  html = html.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`);
+  // numbered list
+  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  // line breaks → paragraphs
+  html = html.split('\n\n').map(p => {
+    p = p.trim();
+    if (!p) return '';
+    if (p.startsWith('<h') || p.startsWith('<ul') || p.startsWith('<ol') || p.startsWith('<blockquote') || p.startsWith('<hr')) return p;
+    return `<p>${p.replace(/\n/g,'<br>')}</p>`;
+  }).join('\n');
+  return html;
+}
+
+// ─── Network Info ────────────────────────────────────────────────────────────
+
+async function loadNetworkInfo() {
+  try {
+    const r = await fetch('/api/network-info');
+    const d = await r.json();
+    const bar   = document.getElementById('networkBar');
+    const urlEl = document.getElementById('networkUrl');
+    const badge = document.getElementById('networkBadge');
+    const hint  = document.getElementById('networkHint');
+    bar.classList.add('show');
+    const displayUrl = d.tunnelUrl || d.localUrl;
+    urlEl.textContent = displayUrl;
+    urlEl.dataset.url = displayUrl;
+    if (d.tunnelUrl) {
+      badge.textContent = '🌍 어디서나 접속 가능';
+      badge.className = 'network-badge tunnel';
+      hint.textContent = '데이터/다른 WiFi에서도 접속 가능';
+    } else {
+      badge.textContent = '📶 같은 WiFi 전용';
+      badge.className = 'network-badge local';
+      hint.textContent = '같은 WiFi에 연결된 기기에서만 접속 가능';
+    }
+  } catch {}
+}
+
+function copyNetworkUrl() {
+  const url = document.getElementById('networkUrl').dataset.url;
+  if (url) navigator.clipboard.writeText(url).then(() => {
+    const el = document.getElementById('networkUrl');
+    const orig = el.textContent;
+    el.textContent = '✓ 복사됨!';
+    setTimeout(() => { el.textContent = orig; }, 1500);
+  });
+}
+
+// ─── Settings ────────────────────────────────────────────────────────────────
+
+function detectProvider(key) {
+  if (!key || key === 'free') return 'free';
+  if (key.startsWith('sk-ant-')) return 'anthropic';
+  if (key.startsWith('AIza'))   return 'gemini';
+  if (key.startsWith('gsk_'))   return 'groq';
+  return 'anthropic';
+}
+
+function updateProviderBadge() {
+  const key = document.getElementById('api-key-input').value.trim();
+  const badge = document.getElementById('provider-badge');
+  const hint  = document.getElementById('api-hint');
+  const p = detectProvider(key);
+  const map = {
+    free:      { label:'🆓 무료 (Pollinations)', color:'#22c55e', bg:'rgba(34,197,94,.15)', hint:'API 키 없이 무료로 사용 (품질 보통)' },
+    gemini:    { label:'✨ Google Gemini', color:'#818cf8', bg:'rgba(99,102,241,.15)', hint:'무료 API 키 사용 중 (품질 우수)' },
+    groq:      { label:'⚡ Groq (Llama)', color:'#f97316', bg:'rgba(249,115,22,.15)', hint:'초고속 무료 API 사용 중' },
+    anthropic: { label:'🔵 Claude (Anthropic)', color:'#9333ea', bg:'rgba(147,51,234,.15)', hint:'유료 Claude API 사용 중' }
+  };
+  const m = map[p] || map.free;
+  badge.textContent = m.label;
+  badge.style.color = m.color; badge.style.background = m.bg;
+  if(hint) hint.textContent = m.hint;
+}
+
+function openSettings() {
+  document.getElementById('api-key-input').value = apiKey;
+  updateProviderBadge();
+  const sel = document.getElementById('model-select');
+  sel.value = currentModel;
+  if (!sel.value) {
+    const opt = document.createElement('option');
+    opt.value = currentModel; opt.textContent = currentModel;
+    sel.appendChild(opt); sel.value = currentModel;
+  }
+  document.getElementById('naver-id-input').value = naverClientId;
+  document.getElementById('naver-secret-input').value = naverClientSecret;
+  document.getElementById('settings-modal').classList.remove('hidden');
+}
+
+function closeSettings() {
+  document.getElementById('settings-modal').classList.add('hidden');
+}
+
+function closeSettingsOutside(e) {
+  if (e.target === document.getElementById('settings-modal')) closeSettings();
+}
+
+function saveSettings() {
+  apiKey = document.getElementById('api-key-input').value.trim();
+  currentModel = document.getElementById('model-select').value;
+  naverClientId = document.getElementById('naver-id-input').value.trim();
+  naverClientSecret = document.getElementById('naver-secret-input').value.trim();
+  localStorage.setItem('ig_apiKey', apiKey);
+  localStorage.setItem('ig_model', currentModel);
+  localStorage.setItem('ig_naver_id', naverClientId);
+  localStorage.setItem('ig_naver_secret', naverClientSecret);
+  fetch('/api/pipeline/set-model', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: currentModel })
+  });
+  closeSettings();
+}
+
+// ─── 미디어 편집기 ──────────────────────────────────────────────────────────
+
+let igItems = [];           // { type:'text'|'image'|'banner', ...fields }
+let igInsertAfter = -1;     // 삽입 위치
+let igDragIdx = null;       // 드래그 중인 아이템 인덱스
+
+function parseWriterToItems(content) {
+  if (!content) return [];
+  const lines = content.split('\n');
+  const blocks = [];
+  let cur = [];
+
+  const isBlockStart = (line) => {
+    const t = line.trim();
+    if (!t) return false;
+    if (/^#{1,4}\s/.test(t)) return true;           // ## 헤딩
+    if (/^\*\*[1-9①-⑩🔢]/.test(t)) return true;   // **1. **①
+    if (/^[🔥💡✅⚡🎯📌📍📎🌟⭐🏆💪👉👆]/.test(t)) return true; // 이모지 섹션
+    if (/^[1-9]\d*[\.)] \*\*/.test(t)) return true; // 1. **제목
+    if (/^[1-9]\d*[\.)] [가-힣A-Z]/.test(t)) return true; // 1. 한글
+    return false;
+  };
+
+  for (const line of lines) {
+    if (isBlockStart(line) && cur.some(l => l.trim())) {
+      blocks.push(cur.join('\n').trim());
+      cur = [line];
+    } else {
+      cur.push(line);
+    }
+  }
+  if (cur.some(l => l.trim())) blocks.push(cur.join('\n').trim());
+
+  // 헤딩 분리가 안 됐으면 빈줄로 다시 분리
+  let result = blocks.filter(Boolean);
+  if (result.length <= 2) {
+    result = content.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+  }
+  return result.map(b => ({ type: 'text', content: b }));
+}
+
+function showIgMediaEditor(content) {
+  igItems = parseWriterToItems(content);
+  renderIgMediaEditor();
+  const editor = document.getElementById('ig-media-editor');
+  editor.classList.add('visible');
+  setTimeout(() => editor.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+}
+
+function renderIgMediaEditor() {
+  const body = document.getElementById('ig-media-body');
+  body.innerHTML = '';
+  if (!igItems.length) {
+    body.innerHTML = '<p style="padding:24px;color:var(--text-muted);font-size:14px;text-align:center">콘텐츠가 없습니다. 파이프라인을 먼저 실행해주세요.</p>';
+    return;
+  }
+
+  // 삽입 존: 두 아이템 사이에 나타남
+  // afterIdx = 이 존 바로 앞 아이템의 index (-1이면 맨 첫번째)
+  const makeInsertZone = (afterIdx) => {
+    const d = document.createElement('div');
+    d.className = 'ig-insert-zone';
+    d.setAttribute('data-after', afterIdx);
+    d.innerHTML =
+      '<span class="iz-line"></span>' +
+      '<div class="iz-btns">' +
+        '<button class="btn-iz" onclick="openIgImgModal(' + afterIdx + ')">📷 이미지 추가</button>' +
+        '<button class="btn-iz btn-iz-banner" onclick="openIgBannerModal(' + afterIdx + ')">🎨 배너 추가</button>' +
+      '</div>' +
+      '<span class="iz-line"></span>';
+    return d;
+  };
+
+  igItems.forEach((item, idx) => {
+    // 각 아이템 앞에 삽입 존 (idx-1 다음 위치)
+    body.appendChild(makeInsertZone(idx - 1));
+
+    const div = document.createElement('div');
+    div.className = 'ig-item';
+    div.id = 'ig-item-' + idx;
+    div.draggable = true;
+    div.ondragstart = (e) => onIgDragStart(e, idx);
+    div.ondragover = (e) => onIgDragOver(e, idx);
+    div.ondrop = (e) => onIgDrop(e, idx);
+    div.ondragend = onIgDragEnd;
+
+    if (item.type === 'text') {
+      div.innerHTML =
+        '<span class="ig-drag-handle" title="드래그로 이동">⠿</span>' +
+        '<div class="ig-item-body">' +
+          '<div class="ig-text-content">' + markdownToHtml(item.content) + '</div>' +
+          '<div class="ig-item-ctrl">' +
+            '<button class="ic-btn ic-del" onclick="deleteIgItem(' + idx + ')">✕ 삭제</button>' +
+          '</div>' +
+        '</div>';
+    } else if (item.type === 'image') {
+      const url = item.url || '';
+      div.innerHTML =
+        '<span class="ig-drag-handle" title="드래그로 이동">⠿</span>' +
+        '<div class="ig-item-body">' +
+          '<img src="' + url + '" class="ig-img-preview" alt="이미지">' +
+          '<input type="url" class="ig-link-input" placeholder="🔗 링크 URL (선택)" ' +
+            'value="' + escHtml(item.link || '') + '" ' +
+            'oninput="igItems[' + idx + '].link=this.value">' +
+          '<div class="ig-item-ctrl">' +
+            '<button class="ic-btn ic-del" onclick="deleteIgItem(' + idx + ')">✕ 삭제</button>' +
+          '</div>' +
+        '</div>';
+    } else if (item.type === 'banner') {
+      const bStyle = _buildBannerStyle(item);
+      const bannerInner = '<div style="' + bStyle + '">' + escHtml(item.text || '배너') + '</div>';
+      const bannerEl = item.link
+        ? '<a href="' + escHtml(item.link) + '" target="_blank" rel="noopener" style="text-decoration:none;display:block">' + bannerInner + '</a>'
+        : bannerInner;
+      div.innerHTML =
+        '<span class="ig-drag-handle" title="드래그로 이동">⠿</span>' +
+        '<div class="ig-item-body" style="flex:1">' +
+          bannerEl +
+          '<div class="ig-item-ctrl">' +
+            '<button class="ic-btn" onclick="editIgBanner(' + idx + ')">✏️ 편집</button>' +
+            '<button class="ic-btn ic-del" onclick="deleteIgItem(' + idx + ')">✕ 삭제</button>' +
+          '</div>' +
+        '</div>';
+    }
+
+    body.appendChild(div);
+  });
+  // 맨 마지막에도 삽입 존
+  body.appendChild(makeInsertZone(igItems.length - 1));
+}
+
+// ── 이미지 검색 모달 ─────────────────────────────────────────────────────────
+
+let igSelectedUrls = new Set(); // 복수 선택
+
+function openIgImgModal(afterIdx) {
+  igInsertAfter = afterIdx;
+  igSelectedUrls.clear();
+  document.getElementById('ig-img-url').value = '';
+  document.getElementById('ig-search-results').innerHTML =
+    '<div style="grid-column:1/-1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px">검색어를 입력하고 🔍 버튼을 누르세요</div>';
+  document.getElementById('ig-select-bar').style.display = 'none';
+  document.getElementById('ig-img-modal').classList.add('show');
+  setTimeout(() => document.getElementById('ig-search-query').focus(), 100);
+}
+
+function closeIgImgModal() {
+  document.getElementById('ig-img-modal').classList.remove('show');
+  igSelectedUrls.clear();
+}
+
+async function doNaverSearch() {
+  const query = document.getElementById('ig-search-query').value.trim();
+  if (!query) { alert('검색어를 입력해주세요.'); return; }
+  if (!naverClientId || !naverClientSecret) {
+    alert('설정(⚙️)에서 네이버 Client ID와 Secret을 먼저 입력해주세요.');
+    return;
+  }
+  const grid = document.getElementById('ig-search-results');
+  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);font-size:13px;padding:24px">🔍 검색 중...</div>';
+  igSelectedUrls.clear();
+  document.getElementById('ig-select-bar').style.display = 'none';
+
+  try {
+    const r = await fetch(`/api/pipeline/naver-image-search?query=${encodeURIComponent(query)}&clientId=${encodeURIComponent(naverClientId)}&clientSecret=${encodeURIComponent(naverClientSecret)}`);
+    const { items, error } = await r.json();
+    if (error) throw new Error(error);
+    if (!items?.length) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);font-size:13px;padding:24px">검색 결과가 없습니다.</div>'; return; }
+
+    grid.innerHTML = items.map((item, i) => `
+      <div class="ig-search-thumb" id="sthumb-${i}" onclick="toggleIgThumb(${i}, '${escapeJs(item.url)}')"
+           title="${escHtml(item.title||'')}">
+        <img src="${escHtml(item.thumb||item.url)}" loading="lazy" alt="${escHtml(item.title||'')}">
+        <div class="ig-search-check">✓</div>
+      </div>`).join('');
+  } catch(e) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--red);font-size:13px;padding:24px">오류: ${escHtml(e.message)}</div>`;
+  }
+}
+
+function toggleIgThumb(idx, url) {
+  const el = document.getElementById('sthumb-' + idx);
+  if (!el) return;
+  if (igSelectedUrls.has(url)) {
+    igSelectedUrls.delete(url);
+    el.classList.remove('selected');
+  } else {
+    igSelectedUrls.add(url);
+    el.classList.add('selected');
+  }
+  const count = igSelectedUrls.size;
+  const bar = document.getElementById('ig-select-bar');
+  bar.style.display = count > 0 ? 'flex' : 'none';
+  document.getElementById('ig-select-count').textContent = count + '장 선택됨';
+}
+
+function confirmIgSelection() {
+  if (!igSelectedUrls.size) return;
+  const insertAt = igInsertAfter + 1;
+  let offset = 0;
+  igSelectedUrls.forEach(url => {
+    igItems.splice(insertAt + offset, 0, { type: 'image', url, name: 'image', link: '' });
+    offset++;
+  });
+  closeIgImgModal();
+  _refreshPublisher();
+}
+
+function addIgImageByUrl() {
+  const url = document.getElementById('ig-img-url').value.trim();
+  if (!url || !url.startsWith('http')) { alert('올바른 이미지 URL을 입력해주세요.'); return; }
+  _igInsertItem({ type: 'image', url, name: 'image', link: '' });
+  closeIgImgModal();
+}
+
+function handleIgFileUpload(input) {
+  const files = [...input.files];
+  if (!files.length) return;
+  const insertAt = igInsertAfter + 1;
+  files.forEach((file, i) => {
+    const objectUrl = URL.createObjectURL(file);
+    igItems.splice(insertAt + i, 0, { type: 'image', url: objectUrl, name: file.name, link: '' });
+  });
+  input.value = '';
+  closeIgImgModal();
+  _refreshPublisher();
+}
+
+function _igInsertItem(item) {
+  const insertAt = igInsertAfter + 1; // -1→0 (맨앞), 0→1, 1→2 ...
+  igItems.splice(insertAt, 0, item);
+  _refreshPublisher();
+}
+
+function _refreshPublisher() {
+  if (activeTab === 'publisher' && stageOutputs['publisher']) {
+    renderOutput('publisher', stageOutputs['publisher'], false);
+  }
+}
+
+// ── 배너 모달 ──────────────────────────────────────────────────────────────
+
+let igEditBannerIdx = null;
+let bnStyles = { bold: true, italic: false, underline: false, shadow: false };
+
+function _bnReset() {
+  bnStyles = { bold: true, italic: false, underline: false, shadow: false };
+  ['bold','italic','underline','shadow'].forEach(k => {
+    const el = document.getElementById('bn-' + k);
+    if (el) el.classList.toggle('active', bnStyles[k]);
+  });
+  document.getElementById('bn-size').value = '20';
+  document.getElementById('bn-size-val').textContent = '20px';
+  document.getElementById('bn-ls').value = '0';
+  document.getElementById('bn-ls-val').textContent = '0';
+  document.getElementById('bn-grad-dir').value = '135deg';
+}
+
+function toggleBnStyle(key) {
+  bnStyles[key] = !bnStyles[key];
+  document.getElementById('bn-' + key).classList.toggle('active', bnStyles[key]);
+  updateIgBannerPreview();
+}
+
+function openIgBannerModal(afterIdx) {
+  igInsertAfter = afterIdx;
+  igEditBannerIdx = null;
+  document.getElementById('bn-text').value = '';
+  document.getElementById('bn-c1').value = '#833AB4';
+  document.getElementById('bn-c2').value = '#E1306C';
+  document.getElementById('bn-tc').value = '#ffffff';
+  document.getElementById('bn-link').value = '';
+  _bnReset();
+  updateIgBannerPreview();
+  document.getElementById('ig-banner-modal').classList.add('show');
+}
+
+function editIgBanner(idx) {
+  const item = igItems[idx];
+  igEditBannerIdx = idx;
+  document.getElementById('bn-text').value = item.text || '';
+  document.getElementById('bn-c1').value = item.c1 || '#833AB4';
+  document.getElementById('bn-c2').value = item.c2 || '#E1306C';
+  document.getElementById('bn-tc').value = item.tc || '#ffffff';
+  document.getElementById('bn-link').value = item.link || '';
+  bnStyles = { bold: !!item.bold, italic: !!item.italic, underline: !!item.underline, shadow: !!item.shadow };
+  ['bold','italic','underline','shadow'].forEach(k => {
+    const el = document.getElementById('bn-' + k);
+    if (el) el.classList.toggle('active', bnStyles[k]);
+  });
+  const sizeEl = document.getElementById('bn-size');
+  sizeEl.value = item.fontSize || 20;
+  document.getElementById('bn-size-val').textContent = (item.fontSize || 20) + 'px';
+  const lsEl = document.getElementById('bn-ls');
+  lsEl.value = item.letterSpacing || 0;
+  document.getElementById('bn-ls-val').textContent = item.letterSpacing || 0;
+  document.getElementById('bn-grad-dir').value = item.gradDir || '135deg';
+  updateIgBannerPreview();
+  document.getElementById('ig-banner-modal').classList.add('show');
+}
+
+function closeIgBannerModal() {
+  document.getElementById('ig-banner-modal').classList.remove('show');
+  igEditBannerIdx = null;
+}
+
+function updateIgBannerPreview() {
+  const text = document.getElementById('bn-text').value || '배너 텍스트를 입력하세요';
+  const c1 = document.getElementById('bn-c1').value;
+  const c2 = document.getElementById('bn-c2').value;
+  const tc = document.getElementById('bn-tc').value;
+  const fontSize = document.getElementById('bn-size').value;
+  const ls = document.getElementById('bn-ls').value;
+  const gradDir = document.getElementById('bn-grad-dir').value;
+  const prev = document.getElementById('ig-banner-live');
+  prev.textContent = text;
+  const bg = gradDir === 'none' ? c1 : `linear-gradient(${gradDir},${c1},${c2})`;
+  prev.style.background = bg;
+  prev.style.color = tc;
+  prev.style.fontSize = fontSize + 'px';
+  prev.style.fontWeight = bnStyles.bold ? '700' : '400';
+  prev.style.fontStyle = bnStyles.italic ? 'italic' : 'normal';
+  prev.style.textDecoration = bnStyles.underline ? 'underline' : 'none';
+  prev.style.textShadow = bnStyles.shadow ? '2px 2px 6px rgba(0,0,0,0.5)' : 'none';
+  prev.style.letterSpacing = ls + 'px';
+}
+
+function _buildBannerStyle(item) {
+  const gradDir = item.gradDir || '135deg';
+  const bg = gradDir === 'none' ? (item.c1||'#833AB4') : `linear-gradient(${gradDir},${item.c1||'#833AB4'},${item.c2||'#E1306C'})`;
+  return [
+    'background:' + bg,
+    'color:' + (item.tc||'#fff'),
+    'border-radius:10px',
+    'padding:16px 24px',
+    'text-align:center',
+    'font-weight:' + (item.bold !== false ? '700' : '400'),
+    'font-style:' + (item.italic ? 'italic' : 'normal'),
+    'text-decoration:' + (item.underline ? 'underline' : 'none'),
+    'text-shadow:' + (item.shadow ? '2px 2px 6px rgba(0,0,0,0.5)' : 'none'),
+    'font-size:' + (item.fontSize||20) + 'px',
+    'letter-spacing:' + (item.letterSpacing||0) + 'px',
+    'word-break:break-word'
+  ].join(';');
+}
+
+function saveIgBanner() {
+  const text = document.getElementById('bn-text').value.trim();
+  if (!text) { alert('배너 텍스트를 입력해주세요.'); return; }
+  const item = {
+    type: 'banner', text,
+    c1: document.getElementById('bn-c1').value,
+    c2: document.getElementById('bn-c2').value,
+    tc: document.getElementById('bn-tc').value,
+    gradDir: document.getElementById('bn-grad-dir').value,
+    link: document.getElementById('bn-link').value.trim(),
+    bold: bnStyles.bold, italic: bnStyles.italic,
+    underline: bnStyles.underline, shadow: bnStyles.shadow,
+    fontSize: parseInt(document.getElementById('bn-size').value) || 20,
+    letterSpacing: parseInt(document.getElementById('bn-ls').value) || 0
+  };
+  if (igEditBannerIdx !== null) {
+    igItems[igEditBannerIdx] = item;
+    closeIgBannerModal();
+    _refreshPublisher();
+  } else {
+    _igInsertItem(item);
+    closeIgBannerModal();
+  }
+}
+
+// ── 삭제 & 드래그 ─────────────────────────────────────────────────────────
+
+function deleteIgItem(idx) {
+  igItems.splice(idx, 1);
+  _refreshPublisher();
+}
+
+function onIgDragStart(e, idx) {
+  igDragIdx = idx;
+  setTimeout(() => document.getElementById('ig-item-' + idx)?.classList.add('dragging'), 0);
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onIgDragOver(e, idx) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function onIgDrop(e, idx) {
+  e.preventDefault();
+  if (igDragIdx === null || igDragIdx === idx) return;
+  const moved = igItems.splice(igDragIdx, 1)[0];
+  const targetIdx = igDragIdx < idx ? idx - 1 : idx;
+  igItems.splice(targetIdx, 0, moved);
+  igDragIdx = null;
+  renderIgMediaEditor();
+}
+
+function onIgDragEnd() {
+  igDragIdx = null;
+  document.querySelectorAll('.ig-item').forEach(el => el.classList.remove('dragging'));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🖼️  카드뉴스 (만화 이미지) 탭
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let cnSlides        = [];       // [{slide,title,text,prompt,imgUrl,loading}]
+let cnArtStyle      = 'comic';  // comic | anime | flat | sketch
+let cnGenerating    = false;
+let cnCharacterDesc  = '';       // 모든 슬라이드 공통 캐릭터 외모 설명
+let cnNeedsCharacter = false;   // 사람 캐릭터 필요 여부
+
+const CN_STYLE_LABELS = {
+  comic:  '🎨 만화/웹툰',
+  anime:  '🌸 애니메이션',
+  flat:   '📐 플랫 디자인',
+  sketch: '✏️ 스케치',
+  photo:  '📷 실사'
+};
+
+// ── 텍스트 렌더링 헬퍼 ─────────────────────────────────────────────────────────
+function cnWrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+  if (!text) return y;
+  const tokens = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const tok of tokens) {
+    const test = line ? line + ' ' + tok : tok;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      if (lines.length >= maxLines) { lines[maxLines - 1] += '…'; break; }
+      line = tok;
+    } else { line = test; }
+  }
+  if (line && lines.length < maxLines) lines.push(line);
+  for (const l of lines) {
+    ctx.fillText(l, x, y);
+    y += lineHeight;
+  }
+  return y;
+}
+
+// ── Blob → Data URL 변환 ──────────────────────────────────────────────────────
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// ── 실시간 텍스트/스타일 재적용 (디바운스 150ms) ─────────────────────────────
+const _liveTimers = {};
+function liveReapply(i) {
+  clearTimeout(_liveTimers[i]);
+  _liveTimers[i] = setTimeout(() => _execLiveReapply(i), 150);
+}
+async function _execLiveReapply(i) {
+  const s = cnSlides[i];
+  if (!s?.rawImgUrl) return;
+  const newUrl = await addCnTextOverlay(s.rawImgUrl, s.slide, s.title, s.text, s.titleStyle, s.textStyle);
+  s.imgUrl = newUrl;
+  const imgEl = document.querySelector(`#cn-img-${i} img`);
+  if (imgEl) imgEl.src = newUrl;
+}
+
+// ── 텍스트 내용 재적용 (버튼 클릭) ───────────────────────────────────────────
+async function reapplyOverlay(i) {
+  const s = cnSlides[i];
+  if (!s?.rawImgUrl) { alert('먼저 이미지를 생성해주세요.'); return; }
+
+  const titleEl = document.getElementById(`cn-title-${i}`);
+  const textEl  = document.getElementById(`cn-text-${i}`);
+  if (titleEl) s.title = titleEl.value;
+  if (textEl)  s.text  = textEl.value;
+
+  const btn = document.getElementById(`cn-reapply-${i}`);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  try {
+    await _execLiveReapply(i);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '✏️ 재적용'; }
+  }
+}
+
+// ── Canvas 텍스트 합성 (스타일/위치 커스텀 지원) ────────────────────────────────
+async function addCnTextOverlay(imgSrc, slideNum, title, bodyText, titleStyle = {}, textStyle = {}) {
+  const ts = { size: 70, color: '#FFE600', bold: true,  shadow: true, posY: 870, ...titleStyle };
+  const bs = { size: 44, color: '#FFFFFF', bold: false, shadow: true, posY: 960, ...textStyle };
+
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1080; canvas.height = 1080;
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.onload = () => {
+      const KO_FONT = '"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif';
+
+      // 1. 이미지
+      ctx.drawImage(img, 0, 0, 1080, 1080);
+
+      // 2. 하단 그라디언트 오버레이
+      const gradTop = Math.min(ts.posY, bs.posY) - 200;
+      const grad = ctx.createLinearGradient(0, Math.max(gradTop, 400), 0, 1080);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(0.4, 'rgba(0,0,0,0.55)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.85)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 1080, 1080);
+
+      // 3. 슬라이드 번호 배지
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+      ctx.fillStyle = 'rgba(138,43,226,0.92)';
+      ctx.beginPath(); ctx.roundRect(28, 28, 72, 72, 12); ctx.fill();
+      ctx.font = 'bold 38px ' + KO_FONT;
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+      ctx.fillText(String(slideNum), 64, 77);
+
+      // ── 텍스트 그리기 헬퍼 ──
+      function drawStyled(text, x, y, style) {
+        const fw = style.bold ? 'bold' : 'normal';
+        ctx.font = `${fw} ${style.size}px ${KO_FONT}`;
+        ctx.textAlign = 'center';
+        if (style.shadow) {
+          ctx.shadowColor = 'rgba(0,0,0,0.9)';
+          ctx.shadowBlur = 12; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
+        } else {
+          ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+        }
+        ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+        ctx.lineWidth = Math.max(3, style.size * 0.1);
+        ctx.lineJoin = 'round';
+        ctx.strokeText(text, x, y);
+        ctx.fillStyle = style.color;
+        ctx.fillText(text, x, y);
+      }
+
+      // ── 긴 텍스트 자동 줄 나눔 ──
+      function drawWrapped(text, x, y, style, maxWidth) {
+        ctx.font = `${style.bold ? 'bold' : 'normal'} ${style.size}px ${KO_FONT}`;
+        if (ctx.measureText(text).width <= maxWidth) {
+          drawStyled(text, x, y, style);
+        } else {
+          const mid = Math.floor(text.length / 2);
+          const sp  = text.indexOf(' ', mid);
+          const l1  = sp > 0 ? text.slice(0, sp) : text.slice(0, mid);
+          const l2  = sp > 0 ? text.slice(sp + 1) : text.slice(mid);
+          const lineH = style.size * 1.2;
+          drawStyled(l1, x, y - lineH * 0.5, style);
+          drawStyled(l2, x, y + lineH * 0.5, style);
+        }
+      }
+
+      // 4. 제목 & 본문 그리기
+      drawStyled(title, ts.posX || 540, ts.posY, ts);
+      drawWrapped(bodyText, bs.posX || 540, bs.posY, bs, 960);
+
+      resolve(canvas.toDataURL('image/jpeg', 0.93));
+    };
+    img.onerror = reject;
+    img.src = imgSrc;
+  });
+}
+
+// ── 렌더링 ──────────────────────────────────────────────────────────────────────
+function renderCardNews() {
+  const numSlides = parseInt(document.getElementById('slide-count').value) || 6;
+  const styleButtons = Object.entries(CN_STYLE_LABELS).map(([k, v]) =>
+    `<button class="cn-style-btn${cnArtStyle===k?' active':''}" onclick="setCnStyle('${k}')">${v}</button>`
+  ).join('');
+
+  // 슬라이드가 생성된 후에만 캐릭터 정보 표시
+  const charHtml = cnSlides.length
+    ? (cnCharacterDesc
+        ? `<div style="padding:10px 16px;background:var(--surface3);border-bottom:1px solid var(--border)">
+            <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px">👤 캐릭터 설정 (모든 슬라이드 공통 — 수정 가능)</div>
+            <textarea id="cn-char-desc" rows="2"
+              style="width:100%;box-sizing:border-box;font-size:12px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);resize:vertical;font-family:inherit"
+              oninput="cnCharacterDesc=this.value">${escHtml(cnCharacterDesc)}</textarea>
+          </div>`
+        : `<div style="padding:8px 16px;background:var(--surface3);border-bottom:1px solid var(--border);font-size:12px;color:var(--text-muted)">
+            🍱 이 주제는 캐릭터 없이 <strong>피사체(음식/제품/장소) 중심</strong> 이미지로 생성됩니다.
+          </div>`)
+    : '';
+
+  let slidesHtml = '';
+  if (!cnSlides.length) {
+    slidesHtml = `<div class="cn-empty">
+      <div class="cn-empty-icon">🖼️</div>
+      <div>파이프라인을 실행한 뒤 <strong>프롬프트 생성</strong>을 눌러주세요.</div>
+      <div style="font-size:12px;color:var(--text-muted)">주제 → 콘텐츠 생성 → 🖼️ 카드뉴스 탭 → 아트 스타일 선택 → 프롬프트 생성</div>
+    </div>`;
+  } else {
+    const allDone = cnSlides.every(s => s.imgUrl);
+    slidesHtml = `<div style="padding:14px 16px 0">
+      <button class="cn-gen-all-btn" onclick="generateAllImages()" ${cnGenerating?'disabled':''}>
+        ${cnGenerating ? '⏳ 이미지 생성 중...' : (allDone ? '🔄 전체 재생성' : '✨ 전체 이미지 생성')}
+      </button>
+    </div><div class="cn-slides">`;
+
+    cnSlides.forEach((s, i) => {
+      const ts = s.titleStyle || { size:70,color:'#FFE600',bold:true,shadow:true,posX:540,posY:870 };
+      const bs = s.textStyle  || { size:44,color:'#FFFFFF',bold:false,shadow:true,posX:540,posY:960 };
+      const tL=(ts.posX/1080*100).toFixed(2), tT=(ts.posY/1080*100).toFixed(2);
+      const bL=(bs.posX/1080*100).toFixed(2), bT=(bs.posY/1080*100).toFixed(2);
+      const tFs=(ts.size/1080*100).toFixed(2), bFs=(bs.size/1080*100).toFixed(2);
+
+      const imgHtml = s.loading
+        ? `<div class="cn-img-wrap"><div class="cn-img-loading"><div class="cn-spinner"></div><div>AI 이미지 생성 중...</div></div></div>`
+        : s.rawImgUrl
+          ? `<div class="cn-canvas-editor" id="cn-canvas-${i}">
+               <img src="${escHtml(s.rawImgUrl)}" class="cn-canvas-bg" ondragstart="return false" alt="">
+               <div class="cn-canvas-grad"></div>
+               <div class="cn-slide-badge-ol">${s.slide}</div>
+               <div class="cn-text-ol" id="cn-t-${i}" data-idx="${i}" data-which="title"
+                    style="left:${tL}%;top:${tT}%;font-size:${tFs}cqw;color:${escHtml(ts.color||'#FFE600')};font-weight:${ts.bold!==false?'bold':'normal'};text-shadow:${ts.shadow!==false?'0.2cqw 0.2cqw 1.2cqw rgba(0,0,0,0.9)':'none'};-webkit-text-stroke:${ts.bold!==false?'0.35':'0.2'}cqw rgba(0,0,0,0.8)"
+                    >${escHtml(s.title)}</div>
+               <div class="cn-text-ol" id="cn-b-${i}" data-idx="${i}" data-which="text"
+                    style="left:${bL}%;top:${bT}%;font-size:${bFs}cqw;color:${escHtml(bs.color||'#FFFFFF')};font-weight:${bs.bold?'bold':'normal'};text-shadow:${bs.shadow!==false?'0.2cqw 0.2cqw 1.2cqw rgba(0,0,0,0.9)':'none'};-webkit-text-stroke:${bs.bold?'0.25':'0.15'}cqw rgba(0,0,0,0.75)"
+                    >${escHtml(s.text)}</div>
+               <div class="cn-float-toolbar" id="cn-ftb-${i}">
+                 <span class="cn-tb-label" id="cn-ftb-lbl-${i}">클릭 선택</span>
+                 <input type="color" class="cn-tb-color" value="${escHtml(ts.color||'#FFE600')}" data-ctrl="color" title="색상">
+                 <input type="range" class="cn-tb-range" min="20" max="140" value="${ts.size||70}" data-ctrl="size">
+                 <span class="cn-tb-val" id="cn-tb-sz-${i}">${ts.size||70}px</span>
+                 <div class="cn-tb-sep"></div>
+                 <button class="cn-tb-btn${ts.bold!==false?' active':''}" data-ctrl="bold" title="굵게">B</button>
+                 <button class="cn-tb-btn${ts.shadow!==false?' active':''}" data-ctrl="shadow" title="그림자">S</button>
+               </div>
+               <button class="cn-dl-btn" style="position:absolute;bottom:8px;right:8px;z-index:30"
+                       onclick="event.stopPropagation(); cnSaveAndDownload(${i})">⬇️ 저장</button>
+               <div style="position:absolute;top:8px;right:8px;z-index:30;font-size:10px;color:rgba(255,255,255,0.7);background:rgba(0,0,0,0.4);padding:3px 7px;border-radius:10px;pointer-events:none">클릭·드래그·더블클릭편집</div>
+             </div>`
+          : `<div class="cn-img-wrap" style="font-size:13px;color:var(--text-muted)">이미지 미생성</div>`;
+
+      slidesHtml += `<div class="cn-slide-card">
+        <div class="cn-slide-header">
+          <div class="cn-slide-num">${s.slide}</div>
+          <div class="cn-slide-title">${escHtml(s.title)}</div>
+          <button class="cn-gen-btn" style="width:auto;padding:6px 14px;font-size:12px" onclick="generateOneImage(${i})" ${s.loading?'disabled':''}>
+            ${s.loading ? '⏳' : '🎨 생성'}
+          </button>
+        </div>
+        <div class="cn-slide-body">
+          <div class="cn-slide-left">
+            <div class="cn-slide-text-label">슬라이드 텍스트 (이미지에 삽입됨)</div>
+            <div style="display:flex;gap:6px;margin-bottom:8px">
+              <div style="flex:1">
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">제목</div>
+                <input type="text" id="cn-title-${i}" value="${escHtml(s.title)}"
+                  oninput="cnSyncText(${i},'title',this.value)"
+                  style="width:100%;box-sizing:border-box;padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;background:var(--surface3);color:var(--text);font-size:13px">
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">본문 메시지</div>
+            <div style="margin-bottom:8px">
+              <input type="text" id="cn-text-${i}" value="${escHtml(s.text)}"
+                oninput="cnSyncText(${i},'text',this.value)"
+                style="width:100%;box-sizing:border-box;padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;background:var(--surface3);color:var(--text);font-size:13px">
+            </div>
+            <div class="cn-slide-text-label">이미지 장면 프롬프트 (수정 가능)</div>
+            <textarea class="cn-prompt-input" id="cn-prompt-${i}" oninput="cnSlides[${i}].prompt=this.value">${escHtml(s.prompt)}</textarea>
+          </div>
+          <div class="cn-slide-right">${imgHtml}</div>
+        </div>
+      </div>`;
+    });
+    slidesHtml += '</div>';
+  }
+
+  const hasTopic = !!(stageOutputs['writer'] || stageOutputs['publisher'] || document.getElementById('topic')?.value?.trim());
+
+  return `<div style="min-height:100%">
+    <div class="cn-toolbar">
+      <span style="font-size:13px;font-weight:600;color:var(--text-soft)">아트 스타일:</span>
+      ${styleButtons}
+      <div style="display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--text-muted)">슬라이드:</span>
+        <input type="range" min="5" max="8" value="${numSlides}" style="width:70px" id="cn-num-range"
+          oninput="document.getElementById('cn-num-val').textContent=this.value+'장'">
+        <span id="cn-num-val" style="font-size:12px;min-width:24px">${numSlides}장</span>
+        <button class="cn-gen-btn" style="width:auto;padding:8px 18px;font-size:13px;margin-left:4px"
+          onclick="generateSlidePrompts()" ${cnGenerating?'disabled':''}>
+          📝 프롬프트 생성
+        </button>
+      </div>
+    </div>
+    ${charHtml}
+    ${slidesHtml}
+  </div>`;
+}
+
+function setCnStyle(style) {
+  cnArtStyle = style;
+  if (activeTab === 'cardnews') document.getElementById('output-body').innerHTML = renderCardNews();
+}
+
+function _cnRefresh() {
+  if (activeTab === 'cardnews') document.getElementById('output-body').innerHTML = renderCardNews();
+}
+
+async function generateSlidePrompts() {
+  if (!apiKey) { alert('⚙️ 설정에서 Anthropic API 키를 먼저 입력해주세요.'); return; }
+  const topic = document.getElementById('topic').value.trim();
+  if (!topic) { alert('주제를 입력해주세요.'); return; }
+  const numSlides = parseInt(document.getElementById('cn-num-range')?.value
+    || document.getElementById('slide-count').value) || 6;
+  const writerContent = stageOutputs['writer'] || stageOutputs['publisher'] || '';
+
+  cnGenerating = true;
+  cnSlides = [];
+  cnCharacterDesc = '';
+  _cnRefresh();
+
+  try {
+    const r = await fetch('/api/pipeline/generate-slide-prompts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, writerContent, numSlides, apiKey, artStyle: CN_STYLE_LABELS[cnArtStyle] })
+    });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    cnCharacterDesc  = data.characterDesc || '';
+    cnNeedsCharacter = !!data.needsCharacter;
+    cnSlides = (data.slides || []).map(s => ({
+      ...s, imgUrl: '', loading: false, rawImgUrl: '',
+      titleStyle: { size: 70, color: '#FFE600', bold: true,  shadow: true, posX: 540, posY: 870 },
+      textStyle:  { size: 44, color: '#FFFFFF', bold: false, shadow: true, posX: 540, posY: 960 }
+    }));
+  } catch(e) {
+    const body = document.getElementById('output-body');
+    if (body) body.innerHTML += `<div style="margin:16px;padding:12px;background:#fee;border:1px solid #f88;border-radius:8px;color:#c00;font-size:13px">
+      ❌ 오류: ${escHtml(e.message)}</div>`;
+  } finally {
+    cnGenerating = false;
+    _cnRefresh();
+  }
+}
+
+async function generateOneImage(idx) {
+  const s = cnSlides[idx];
+  if (!s || s.loading) return;
+
+  // 최신 편집값 저장
+  const promptEl = document.getElementById(`cn-prompt-${idx}`);
+  if (promptEl) s.prompt = promptEl.value.trim();
+
+  s.loading = true;
+  s.imgUrl  = '';
+  _cnRefresh();
+
+  try {
+    // 캐릭터 일관성: characterDesc + 장면 prompt 합성
+    const charEl = document.getElementById('cn-char-desc');
+    if (charEl) cnCharacterDesc = charEl.value.trim();
+    const fullPrompt = (cnNeedsCharacter && cnCharacterDesc)
+      ? `${cnCharacterDesc}, ${s.prompt}`
+      : s.prompt;
+
+    const noHumans = !cnNeedsCharacter;
+    const url = `/api/pipeline/generate-image?prompt=${encodeURIComponent(fullPrompt)}&style=${encodeURIComponent(cnArtStyle)}&width=1080&height=1080&noHumans=${noHumans}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`서버 오류 ${r.status}`);
+    const blob = await r.blob();
+    // data URL로 변환해 원본 보존 (텍스트 재적용 시 재사용)
+    const rawDataUrl = await blobToDataUrl(blob);
+    s.rawImgUrl = rawDataUrl;
+
+    // Canvas 텍스트 합성 (스타일 적용)
+    s.imgUrl = await addCnTextOverlay(rawDataUrl, s.slide, s.title, s.text, s.titleStyle, s.textStyle);
+  } catch(e) {
+    s.error = e.message;
+    console.error(`[slide ${s.slide}]`, e.message);
+  } finally {
+    s.loading = false;
+    _cnRefresh();
+  }
+}
+
+async function generateAllImages() {
+  if (cnGenerating) return;
+  cnGenerating = true;
+  _cnRefresh();
+  for (let i = 0; i < cnSlides.length; i++) {
+    await generateOneImage(i);
+  }
+  cnGenerating = false;
+  _cnRefresh();
+}
+
+// ── 텍스트 sync (입력창 → 오버레이) ─────────────────────────────────────────
+function cnSyncText(idx, which, val) {
+  if (which === 'title') cnSlides[idx].title = val;
+  else cnSlides[idx].text = val;
+  const el = document.getElementById(which === 'title' ? `cn-t-${idx}` : `cn-b-${idx}`);
+  if (el && !el.classList.contains('cn-editing')) el.textContent = val;
+}
+
+// ── 드래그 시스템 ────────────────────────────────────────────────────────────
+let _cnd = null; // { el, idx, which, sx, sy, sl, st, cw, ch }
+let _cnActiveEl = null, _cnActiveIdx = null, _cnActiveWhich = null;
+
+(function setupCnDrag() {
+  const onDown = (e) => {
+    const el = e.target.closest('.cn-text-ol');
+    if (!el || el.classList.contains('cn-editing')) return;
+    const isTap = e.type === 'touchstart';
+    const cx = isTap ? e.touches[0].clientX : e.clientX;
+    const cy = isTap ? e.touches[0].clientY : e.clientY;
+    const container = el.closest('.cn-canvas-editor');
+    const rect = container.getBoundingClientRect();
+    _cnd = { el, idx: +el.dataset.idx, which: el.dataset.which,
+             sx: cx, sy: cy, sl: parseFloat(el.style.left)||50,
+             st: parseFloat(el.style.top)||50, cw: rect.width, ch: rect.height };
+    cnSelectOverlay(el, +el.dataset.idx, el.dataset.which);
+    if (!isTap) e.preventDefault();
+  };
+  const onMove = (e) => {
+    if (!_cnd) return;
+    const isTap = e.type === 'touchmove';
+    const cx = isTap ? e.touches[0].clientX : e.clientX;
+    const cy = isTap ? e.touches[0].clientY : e.clientY;
+    const nl = Math.max(-15, Math.min(115, _cnd.sl + (cx - _cnd.sx) / _cnd.cw * 100));
+    const nt = Math.max(-5,  Math.min(105, _cnd.st + (cy - _cnd.sy) / _cnd.ch * 100));
+    _cnd.el.style.left = nl + '%'; _cnd.el.style.top = nt + '%';
+    if (isTap) e.preventDefault();
+  };
+  const onUp = () => {
+    if (!_cnd) return;
+    const style = _cnd.which === 'title' ? cnSlides[_cnd.idx].titleStyle : cnSlides[_cnd.idx].textStyle;
+    style.posX = parseFloat(_cnd.el.style.left) / 100 * 1080;
+    style.posY = parseFloat(_cnd.el.style.top)  / 100 * 1080;
+    _cnd = null;
+  };
+  document.addEventListener('mousedown',  onDown);
+  document.addEventListener('mousemove',  onMove);
+  document.addEventListener('mouseup',    onUp);
+  document.addEventListener('touchstart', onDown, { passive: false });
+  document.addEventListener('touchmove',  onMove, { passive: false });
+  document.addEventListener('touchend',   onUp);
+
+  // 외부 클릭 → 선택 해제
+  document.addEventListener('mousedown', (e) => {
+    if (!e.target.closest('.cn-text-ol') && !e.target.closest('.cn-float-toolbar')) {
+      if (_cnActiveEl) { _cnActiveEl.classList.remove('cn-selected'); _cnActiveEl = null; }
+      document.querySelectorAll('.cn-float-toolbar').forEach(t => t.style.display = 'none');
+    }
+  });
+
+  // 더블클릭 → 인라인 편집
+  document.addEventListener('dblclick', (e) => {
+    const el = e.target.closest('.cn-text-ol');
+    if (!el) return;
+    el.contentEditable = 'plaintext-only';
+    el.classList.remove('cn-selected'); el.classList.add('cn-editing');
+    el.style.cursor = 'text'; el.focus();
+    const r = document.createRange(); r.selectNodeContents(el);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    e.preventDefault();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' || (e.key === 'Enter' && !e.shiftKey)) {
+      document.querySelectorAll('.cn-text-ol.cn-editing').forEach(cnFinishEdit);
+    }
+  });
+  document.addEventListener('focusout', (e) => {
+    const el = e.target.closest?.('.cn-text-ol.cn-editing');
+    if (el) setTimeout(() => cnFinishEdit(el), 120);
+  }, true);
+})();
+
+function cnFinishEdit(el) {
+  el.contentEditable = 'false';
+  el.classList.remove('cn-editing'); el.classList.add('cn-selected');
+  el.style.cursor = 'grab';
+  const idx = +el.dataset.idx, which = el.dataset.which;
+  const val = el.textContent.trim();
+  if (which === 'title') { cnSlides[idx].title = val; const ip = document.getElementById(`cn-title-${idx}`); if (ip) ip.value = val; }
+  else { cnSlides[idx].text = val; const ip = document.getElementById(`cn-text-${idx}`); if (ip) ip.value = val; }
+}
+
+function cnSelectOverlay(el, idx, which) {
+  if (_cnActiveEl) _cnActiveEl.classList.remove('cn-selected');
+  _cnActiveEl = el; _cnActiveIdx = idx; _cnActiveWhich = which;
+  el.classList.add('cn-selected');
+  const tb = document.getElementById(`cn-ftb-${idx}`);
+  if (!tb) return;
+  const s = cnSlides[idx]; if (!s) return;
+  const style = which === 'title' ? s.titleStyle : s.textStyle;
+  const lbl   = document.getElementById(`cn-ftb-lbl-${idx}`);
+  const colorC = tb.querySelector('[data-ctrl="color"]');
+  const sizeC  = tb.querySelector('[data-ctrl="size"]');
+  const boldB  = tb.querySelector('[data-ctrl="bold"]');
+  const shadowB= tb.querySelector('[data-ctrl="shadow"]');
+  const szVal  = document.getElementById(`cn-tb-sz-${idx}`);
+  if (lbl)   lbl.textContent = which === 'title' ? '제목' : '본문';
+  if (colorC) colorC.value = style.color || '#ffffff';
+  if (sizeC)  sizeC.value  = style.size  || 44;
+  if (szVal)  szVal.textContent = (style.size || 44) + 'px';
+  if (boldB)   boldB.classList.toggle('active',  !!style.bold);
+  if (shadowB) shadowB.classList.toggle('active', style.shadow !== false);
+  tb.dataset.activeWhich = which;
+  // 툴바 위치: 선택된 텍스트 위
+  const container = el.closest('.cn-canvas-editor');
+  if (container) {
+    const elR = el.getBoundingClientRect(), cR = container.getBoundingClientRect();
+    const topPct = Math.max(1, (elR.top - cR.top) / cR.height * 100 - 9);
+    tb.style.top = topPct + '%';
+  }
+  tb.style.display = 'flex';
+}
+
+// 툴바 컨트롤 이벤트 (색상·크기 input + 굵게·그림자 click)
+document.addEventListener('input', (e) => {
+  const ctrl = e.target.closest?.('.cn-float-toolbar [data-ctrl]');
+  if (!ctrl) return;
+  const tb = ctrl.closest('.cn-float-toolbar');
+  const idx = +tb.id.replace('cn-ftb-', '');
+  const which = tb.dataset.activeWhich || 'title';
+  const style = which === 'title' ? cnSlides[idx]?.titleStyle : cnSlides[idx]?.textStyle;
+  if (!style) return;
+  const textEl = document.getElementById(which === 'title' ? `cn-t-${idx}` : `cn-b-${idx}`);
+  if (ctrl.dataset.ctrl === 'color') {
+    style.color = ctrl.value;
+    if (textEl) textEl.style.color = ctrl.value;
+  } else if (ctrl.dataset.ctrl === 'size') {
+    style.size = +ctrl.value;
+    if (textEl) textEl.style.fontSize = (style.size / 1080 * 100).toFixed(2) + 'cqw';
+    const szv = document.getElementById(`cn-tb-sz-${idx}`);
+    if (szv) szv.textContent = style.size + 'px';
+  }
+});
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest?.('.cn-float-toolbar [data-ctrl="bold"], .cn-float-toolbar [data-ctrl="shadow"]');
+  if (!btn) return;
+  const tb = btn.closest('.cn-float-toolbar');
+  const idx = +tb.id.replace('cn-ftb-', '');
+  const which = tb.dataset.activeWhich || 'title';
+  const style = which === 'title' ? cnSlides[idx]?.titleStyle : cnSlides[idx]?.textStyle;
+  if (!style) return;
+  const textEl = document.getElementById(which === 'title' ? `cn-t-${idx}` : `cn-b-${idx}`);
+  if (btn.dataset.ctrl === 'bold') {
+    style.bold = !style.bold; btn.classList.toggle('active', style.bold);
+    if (textEl) {
+      textEl.style.fontWeight = style.bold ? 'bold' : 'normal';
+      textEl.style.webkitTextStroke = (style.bold ? '0.35' : '0.2') + 'cqw rgba(0,0,0,0.8)';
+    }
+  } else if (btn.dataset.ctrl === 'shadow') {
+    style.shadow = !style.shadow; btn.classList.toggle('active', style.shadow);
+    if (textEl) textEl.style.textShadow = style.shadow ? '0.2cqw 0.2cqw 1.2cqw rgba(0,0,0,0.9)' : 'none';
+  }
+});
+
+// ── 저장 (현재 DOM 상태 → 캔버스 베이크 → 다운로드) ─────────────────────────
+async function cnSaveAndDownload(idx) {
+  const s = cnSlides[idx];
+  if (!s?.rawImgUrl) return;
+  const titleEl = document.getElementById(`cn-t-${idx}`);
+  const bodyEl  = document.getElementById(`cn-b-${idx}`);
+  if (titleEl) { s.title = titleEl.textContent.trim() || s.title; s.titleStyle.posX = parseFloat(titleEl.style.left)/100*1080; s.titleStyle.posY = parseFloat(titleEl.style.top)/100*1080; s.titleStyle.size = parseFloat(titleEl.style.fontSize)/100*1080; }
+  if (bodyEl)  { s.text  = bodyEl.textContent.trim()  || s.text;  s.textStyle.posX  = parseFloat(bodyEl.style.left)/100*1080;  s.textStyle.posY  = parseFloat(bodyEl.style.top)/100*1080;  s.textStyle.size  = parseFloat(bodyEl.style.fontSize)/100*1080; }
+  const baked = await addCnTextOverlay(s.rawImgUrl, s.slide, s.title, s.text, s.titleStyle, s.textStyle);
+  s.imgUrl = baked;
+  const a = document.createElement('a'); a.href = baked; a.download = `slide_${s.slide}_${Date.now()}.jpg`; a.click();
+}
+
+function cnDownload(idx) { cnSaveAndDownload(idx); }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function loadModels() {
+  document.getElementById('model-hint').textContent = '모델 목록 불러오는 중...';
+  try {
+    const r = await fetch('/api/pipeline/list-models');
+    const { modelDetails, error } = await r.json();
+    if (error) throw new Error(error);
+    const sel = document.getElementById('model-select');
+    const prev = sel.value;
+    sel.innerHTML = modelDetails.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+    const ids = modelDetails.map(m => m.id);
+    if (ids.includes(prev)) sel.value = prev;
+    document.getElementById('model-hint').textContent = `✓ 모델 ${modelDetails.length}개 조회 완료`;
+  } catch(e) {
+    document.getElementById('model-hint').textContent = '오류: ' + e.message;
+  }
+}
+</script>
+</body>
+</html>
