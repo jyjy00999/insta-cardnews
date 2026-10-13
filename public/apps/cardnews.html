@@ -128,11 +128,13 @@ input[type=range]{flex:1;height:4px;accent-color:var(--p1);cursor:pointer}
 
 .dl-all-bar{display:none;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;padding:10px}
 .dl-all-bar.show{display:flex}
-/* 빠진 이미지가 있을 때만 뜬다. 눈에 띄되 [전체 저장]보다 앞서 보이지 않게 테두리형으로. */
-.btn-regen-missing{padding:11px 24px;border-radius:var(--r);border:1.5px solid var(--p2);background:var(--surf);color:var(--p2);font-family:inherit;font-size:.9rem;font-weight:700;cursor:pointer;transition:.2s}
-.btn-regen-missing:hover:not(:disabled){background:var(--p2);color:#fff}
-.btn-regen-missing:disabled{opacity:.6;cursor:not-allowed}
+/* 빠진 이미지가 있을 때만 사이드바의 [콘텐츠 생성] 바로 밑에 뜬다.
+   [콘텐츠 재생성]과 헷갈리지 않게 색을 달리하고 아래에 설명을 붙인다. */
+.btn-regen-missing{width:100%;margin-top:8px;padding:12px;border-radius:var(--r);border:none;background:linear-gradient(135deg,#0d9488,#0891b2);color:#fff;font-family:inherit;font-size:.9rem;font-weight:700;cursor:pointer;transition:.2s;box-shadow:0 4px 18px rgba(13,148,136,.35)}
+.btn-regen-missing:hover:not(:disabled){filter:brightness(1.1);transform:translateY(-1px)}
+.btn-regen-missing:disabled{opacity:.6;cursor:not-allowed;transform:none}
 .btn-regen-missing .spin{display:inline-block;animation:spin .7s linear infinite}
+.regen-missing-hint{margin-top:5px;font-size:.7rem;color:var(--tx2);text-align:center;line-height:1.5}
 .btn-dl-all{padding:11px 32px;border-radius:var(--r);border:none;background:var(--grad);color:#fff;font-size:.9rem;font-weight:700;cursor:pointer;transition:.2s;box-shadow:0 4px 18px rgba(109,40,217,.35)}
 .btn-dl-all:hover{background:var(--grad-h);transform:translateY(-1px)}
 
@@ -341,6 +343,10 @@ input[type=range]{flex:1;height:4px;accent-color:var(--p1);cursor:pointer}
     <div class="progress-bar" id="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
 
     <button class="btn-generate" id="btn-generate" onclick="generateAll()">✨ 콘텐츠 생성</button>
+    <!-- 빠진 이미지가 있을 때만 뜬다. 결과 맨 아래에 두면 슬라이드 8장을 지나야
+         보여서, 늘 보이는 [콘텐츠 재생성]을 누르게 된다. 바로 밑에 붙인다. -->
+    <button class="btn-regen-missing" id="btn-regen-missing" onclick="regenMissing()" style="display:none">🧩 남은 이미지 생성</button>
+    <div class="regen-missing-hint" id="regen-missing-hint" style="display:none">글은 그대로 두고 빈 그림만 채웁니다</div>
     <button class="btn-stop" id="btn-stop" onclick="stopGeneration()">⏹ 생성 중지</button>
 
   </aside>
@@ -377,7 +383,6 @@ input[type=range]{flex:1;height:4px;accent-color:var(--p1);cursor:pointer}
     </div>
 
     <div class="dl-all-bar" id="dl-all-bar">
-      <button class="btn-regen-missing" id="btn-regen-missing" onclick="regenMissing()" style="display:none">🧩 남은 이미지 생성</button>
       <button class="btn-dl-all" onclick="downloadAll()">⬇️ 전체 저장</button>
     </div>
   </main>
@@ -805,9 +810,11 @@ function missingSlides(){
 /** 빠진 이미지 개수에 따라 버튼을 보여주거나 숨긴다 */
 function updateMissingBar(){
   const bar=document.getElementById('btn-regen-missing');
+  const hint=document.getElementById('regen-missing-hint');
   if(!bar) return;
   const n=missingSlides().length;
-  bar.style.display = n>0 ? 'inline-block' : 'none';
+  bar.style.display = n>0 ? 'block' : 'none';
+  if(hint) hint.style.display = n>0 ? 'block' : 'none';
   bar.innerHTML = `🧩 남은 이미지 ${n}장 생성`;
 }
 
