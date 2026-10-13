@@ -295,9 +295,21 @@ select.finp option{background:var(--surf)}
     <div class="sel-info" id="sel-info" style="display:none">
       <span>✅</span><span class="si-name" id="sel-name">선택됨</span>
       <label style="display:flex;align-items:center;gap:3px;font-size:.72rem;cursor:pointer;color:var(--tx2);flex-shrink:0">
-        <input type="checkbox" id="chk-compose" style="accent-color:var(--acc)"> 영상합성
+        <input type="checkbox" id="chk-compose" checked style="accent-color:var(--acc)"> 영상에 띄우기
       </label>
       <button onclick="clearSel()">✕</button>
+    </div>
+    <!-- 캐릭터 생김새. 이 글이 장면 그림 프롬프트에 그대로 들어간다.
+         이미지 분석이 되는 키면 자동으로 채워지고, 아니면 직접 적으면 된다. -->
+    <div id="char-desc-row" style="display:none;margin-top:8px">
+      <label class="flbl" style="font-size:.7rem">캐릭터 생김새 (영어로 쓰면 더 잘 나옵니다)</label>
+      <textarea class="finp" id="char-desc" rows="2"
+        placeholder="예: cute red apple character with arms and legs, big eyes, 3d render"
+        style="font-size:.72rem;line-height:1.5;resize:vertical"
+        oninput="onCharDescInput(this.value)"></textarea>
+      <div style="font-size:.66rem;color:var(--tx3);margin-top:3px">
+        이 설명대로 모든 장면에 캐릭터가 그려집니다.
+      </div>
     </div>
     <div class="img-analyzing" id="img-analyzing"></div>
   </div>
@@ -463,31 +475,60 @@ async function handleImgUpload(e){
     const dataUrl = await fileToDataUrl(f);
     const img = new Image(); img.src = dataUrl;
     images.push({ dataUrl, img, description:'', nameKo: f.name.replace(/\.[^.]+$/,'').slice(0,10) });
-    renderImgGrid();
-    // 자동 분석
     const idx = images.length - 1;
+    // 올린 걸 쓰려고 올린 것이다. 고르는 걸 깜빡해서 캐릭터가 빠지는 일이 없게
+    // 첫 장은 자동으로 선택한다.
+    if(selectedIdx < 0) selectImg(idx);
+    renderImgGrid();
     analyzeImg(dataUrl, f.type||'image/jpeg', idx);
   }
   e.target.value = '';
 }
 
 async function analyzeImg(dataUrl, mediaType, idx){
-  if(!apiKey?.trim()) return;
-  document.getElementById('img-analyzing').textContent = '⏳ 이미지 분석 중...';
+  const note = document.getElementById('img-analyzing');
+  // 분석이 안 되더라도 캐릭터를 쓸 수 있어야 한다. 설명을 직접 적게 안내한다.
+  const askManual = msg => {
+    note.textContent = msg;
+    if(selectedIdx === idx) document.getElementById('char-desc')?.focus();
+  };
+
+  if(!apiKey?.trim()){
+    askManual('⚠️ 키가 없어 이미지를 못 읽습니다. 생김새를 아래에 직접 적어주세요.');
+    return;
+  }
+
+  note.textContent = '⏳ 이미지 분석 중...';
   try {
     const base64 = dataUrl.split(',')[1];
     const r = await fetch('/api/reels/analyze-image',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({imageBase64:base64, mediaType, apiKey})});
     const d = await r.json();
-    if(r.ok && images[idx]){
-      images[idx].description = d.description || '';
-      images[idx].nameKo = d.nameKo || images[idx].nameKo;
-      renderImgGrid();
-      document.getElementById('img-analyzing').textContent = `✅ 분석 완료: ${d.nameKo||''}`;
-      if(selectedIdx === idx) updateSelInfo();
+
+    if(!r.ok){
+      // Groq·Pollinations 는 이미지를 못 본다. 그냥 넘어가면 캐릭터 없는 영상이 나온다.
+      askManual(d.unsupported
+        ? '⚠️ 이 키로는 이미지를 못 읽습니다. 생김새를 아래에 직접 적어주세요.'
+        : `⚠️ 분석 실패 — 생김새를 아래에 직접 적어주세요.`);
+      return;
     }
-  } catch(e){ console.warn('분석 실패', e) }
-  finally { setTimeout(()=>{document.getElementById('img-analyzing').textContent=''}, 3000) }
+    if(!images[idx]) return;
+
+    images[idx].description = d.description || '';
+    images[idx].nameKo = d.nameKo || images[idx].nameKo;
+    renderImgGrid();
+    note.textContent = `✅ 분석 완료: ${d.nameKo||''}`;
+    if(selectedIdx === idx) updateSelInfo();
+    setTimeout(()=>{ note.textContent='' }, 3000);
+  } catch(e){
+    console.warn('분석 실패', e);
+    askManual('⚠️ 분석 실패 — 생김새를 아래에 직접 적어주세요.');
+  }
+}
+
+/** 손으로 고친 설명을 그 이미지에 저장한다 */
+function onCharDescInput(v){
+  if(selectedIdx>=0 && images[selectedIdx]) images[selectedIdx].description = v;
 }
 
 function renderImgGrid(){
@@ -507,11 +548,25 @@ function selectImg(idx){
 }
 function updateSelInfo(){
   const si = document.getElementById('sel-info');
-  if(selectedIdx < 0 || !images[selectedIdx]){ si.style.display='none'; return }
+  const row = document.getElementById('char-desc-row');
+  const ta  = document.getElementById('char-desc');
+  if(selectedIdx < 0 || !images[selectedIdx]){
+    si.style.display='none';
+    if(row) row.style.display='none';
+    return;
+  }
   si.style.display='flex';
   document.getElementById('sel-name').textContent = images[selectedIdx].nameKo || '선택됨';
+  // 생김새 칸을 열고 그 이미지에 저장된 설명을 보여준다
+  if(row) row.style.display='block';
+  if(ta) ta.value = images[selectedIdx].description || '';
 }
-function clearSel(){ selectedIdx=-1; renderImgGrid(); document.getElementById('sel-info').style.display='none' }
+function clearSel(){
+  selectedIdx=-1; renderImgGrid();
+  document.getElementById('sel-info').style.display='none';
+  const row = document.getElementById('char-desc-row');
+  if(row) row.style.display='none';
+}
 function removeImg(idx){
   images.splice(idx,1);
   if(selectedIdx===idx) selectedIdx=-1;
@@ -648,7 +703,10 @@ async function generateReel(){
     const failedScenes=[];
 
     async function fetchSceneImage(sc, i, attempt){
-      const ir = await fetch(`/api/reels/generate-image?prompt=${encodeURIComponent(sc.imagePrompt)}&seed=${i*1337+7+attempt*101}`);
+      // 캐릭터 설명을 장면마다 같이 보낸다. 서버가 이걸 프롬프트 앞에 세우고
+      // person·face 억제를 풀어서, 올린 캐릭터가 실제로 장면에 나오게 한다.
+      const charQ = charDesc ? `&character=${encodeURIComponent(charDesc)}` : '';
+      const ir = await fetch(`/api/reels/generate-image?prompt=${encodeURIComponent(sc.imagePrompt)}&seed=${i*1337+7+attempt*101}${charQ}`);
       if(!ir.ok) throw new Error(`HTTP ${ir.status}`);
       const blob = await ir.blob();
       if(blob.size < 2000) throw new Error('빈 이미지');   // 오류 JSON 이 섞여 오는 경우

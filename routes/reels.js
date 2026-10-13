@@ -20,8 +20,12 @@ router.post('/generate-script', async (req, res) => {
     cute: '귀엽고 친근한 느낌, 이모지 풍부하게, 밝고 따뜻한 톤'
   };
 
-  const charHint = characterDesc
-    ? `\n🎭 등장 캐릭터/제품: ${characterDesc}\n→ imagePrompt에 이 캐릭터/제품을 배경 장면에 어울리도록 반드시 포함시켜.`
+  const hasChar = !!(characterDesc || '').trim();
+  const charHint = hasChar
+    ? `\n🎭 주인공 캐릭터/제품: ${characterDesc}
+→ 이 캐릭터가 영상의 주인공이다. 모든 장면의 imagePrompt 맨 앞에 이 캐릭터를 넣고,
+  장면마다 무엇을 하고 있는지(동작·표정·위치)를 이어서 써라.
+→ 장면이 바뀌어도 같은 캐릭터로 보이도록 생김새 묘사를 매번 그대로 반복해라.`
     : '';
 
   let videoHint = '';
@@ -71,7 +75,9 @@ imagePrompt 규칙:
 - 반드시 영어로 작성
 - 세로형(9:16) vertical composition
 - 배경은 장면 내용/컨셉과 어울리는 분위기
-- 사람 포함 금지
+${hasChar
+  ? '- 위 주인공 캐릭터를 매 장면 맨 앞에 넣고, 그 캐릭터가 하는 행동을 이어서 묘사'
+  : '- 사람 포함 금지'}
 - 스타일: cinematic, high contrast, atmospheric lighting
 
 JSON만 응답:
@@ -251,11 +257,24 @@ router.get('/tts', async (req, res) => {
 
 // ── 이미지 생성 (세로형) ───────────────────────────────────────
 router.get('/generate-image', async (req, res) => {
-  const { prompt, seed } = req.query;
+  const { prompt, seed, character } = req.query;
   if (!prompt) return res.status(400).json({ error: 'prompt 필요' });
   const s = seed || Math.floor(Math.random() * 99999);
-  const full = `${prompt}, vertical composition 9:16, ultra detailed, cinematic, high quality, instagram reel`;
-  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(full)}?width=576&height=1024&nologo=true&seed=${s}&model=flux&negative=${encodeURIComponent('text,watermark,logo,blurry,ugly,distorted,person,face,human')}`;
+
+  // 캐릭터를 올린 경우에는 그 캐릭터가 장면마다 나와야 한다.
+  // 예전엔 negative 에 person·face·human 이 박혀 있어서, 캐릭터를 아무리
+  // 설명해도 모델이 지워 버렸다. 캐릭터가 있으면 그 억제를 풀고 앞세운다.
+  const char = (character || '').trim();
+  const full = char
+    ? `${char}, ${prompt}, the character is clearly visible in the scene, vertical composition 9:16, ultra detailed, cinematic, high quality, instagram reel`
+    : `${prompt}, vertical composition 9:16, ultra detailed, cinematic, high quality, instagram reel`;
+
+  const negative = char
+    ? 'text, watermark, logo, blurry, ugly, distorted, extra limbs, deformed'
+    : 'text, watermark, logo, blurry, ugly, distorted, person, face, human';
+
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(full)}` +
+    `?width=576&height=1024&nologo=true&seed=${s}&model=flux&negative=${encodeURIComponent(negative)}`;
   await proxyPollinationsImage(res, url, '릴스 이미지');
 });
 
