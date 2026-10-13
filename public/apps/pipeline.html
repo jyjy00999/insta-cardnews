@@ -677,7 +677,24 @@ textarea::placeholder, input[type="text"]::placeholder { color: var(--text-muted
   <div class="input-card">
     <h2>📸 인스타그램 글쓰기</h2>
 
-    <div style="margin-bottom:14px">
+    <div class="form-row">
+      <div class="form-group" style="flex:2">
+        <label>주제 / 키워드</label>
+        <textarea id="topic" rows="2" placeholder="예: 이사할 때 주의할 점, 퇴근 후 자기계발 루틴, 다이어트 없이 건강해지는 법"></textarea>
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <button class="suggest-btn" id="btn-suggest" onclick="suggestTopics()">
+        🔥 떡상 주제 10개 추천
+      </button>
+    </div>
+    <div class="suggest-panel" id="suggest-panel">
+      <div class="suggest-panel-title">✨ 클릭해서 주제 선택</div>
+      <div class="suggest-chips" id="suggest-chips"></div>
+    </div>
+
+    <!-- 포스트 타입은 주제를 정한 뒤에 고르는 쪽이 순서에 맞아 여기로 내렸다 -->
+    <div style="margin:14px 0">
       <label class="form-group" style="display:block;margin-bottom:6px">
         <span class="modal-label" style="display:inline">포스트 타입</span>
       </label>
@@ -693,22 +710,6 @@ textarea::placeholder, input[type="text"]::placeholder { color: var(--text-muted
         <span class="slide-count-val" id="slide-count-val">6</span>장
         <span style="font-size:11px;color:var(--text-muted);margin-left:4px">(최대 8장)</span>
       </div>
-    </div>
-
-    <div class="form-row">
-      <div class="form-group" style="flex:2">
-        <label>주제 / 키워드</label>
-        <textarea id="topic" rows="2" placeholder="예: 이사할 때 주의할 점, 퇴근 후 자기계발 루틴, 다이어트 없이 건강해지는 법"></textarea>
-      </div>
-    </div>
-    <div style="margin-top:10px">
-      <button class="suggest-btn" id="btn-suggest" onclick="suggestTopics()">
-        🔥 떡상 주제 10개 추천
-      </button>
-    </div>
-    <div class="suggest-panel" id="suggest-panel">
-      <div class="suggest-panel-title">✨ 클릭해서 주제 선택</div>
-      <div class="suggest-chips" id="suggest-chips"></div>
     </div>
 
     <details style="margin:14px 0">
