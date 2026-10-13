@@ -11,7 +11,17 @@ const os = require('os');
 
 const app = express();
 app.use(express.json({ limit: '20mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+
+// 화면 파일은 브라우저가 쥐고 있지 않게 한다.
+// 고쳐서 배포해도 옛 화면이 그대로 떠서, 매번 Ctrl+Shift+R 을 눌러야 했다.
+// HTML 과 공용 스크립트만 막고, 이미지 같은 건 그대로 캐시하게 둔다.
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders(res, filePath) {
+    if (/\.(html|js|json)$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    }
+  }
+}));
 
 app.use('/api/cardnews', require('./routes/cardnews'));
 app.use('/api/reels',    require('./routes/reels'));
