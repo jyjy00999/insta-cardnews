@@ -87,6 +87,8 @@ textarea:focus{outline:none;border-color:var(--acc)}
 .btn-gen{margin-top:6px;padding:14px;border-radius:var(--r);border:none;background:var(--grad);color:#fff;font-size:.94rem;font-weight:900;width:100%;transition:.15s;letter-spacing:.02em}
 .btn-gen:hover{opacity:.88;transform:translateY(-1px)}
 .btn-gen:disabled{opacity:.38;cursor:not-allowed;transform:none}
+.autodl-row{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:.74rem;color:var(--tx2);cursor:pointer;user-select:none}
+.autodl-row input{accent-color:var(--acc);cursor:pointer}
 .btn-stop{margin-top:6px;padding:10px;border-radius:var(--r);border:1.5px solid var(--err);background:rgba(239,68,68,.08);color:var(--err);font-size:.85rem;font-weight:700;width:100%;transition:.15s}
 .btn-stop:hover{background:var(--err);color:#fff}
 
@@ -344,6 +346,10 @@ select.finp option{background:var(--surf)}
   </div>
 
   <button class="btn-gen" id="btn-gen" onclick="generateReel()">🎬 릴스 생성</button>
+  <label class="autodl-row">
+    <input type="checkbox" id="chk-autodl" checked onchange="saveAutoDl(this.checked)">
+    <span>다 만들어지면 바로 저장</span>
+  </label>
   <button class="btn-stop" id="btn-stop" style="display:none" onclick="stopGen()">⏹ 생성 중지</button>
 </aside>
 
@@ -755,13 +761,21 @@ async function generateReel(){
     const ttsBuffers = await fetchAllTTS(scenes);
 
     // 5. 영상 렌더링
-    setSt('<span class="spin">⟳</span> 영상 렌더링 중 (Canvas + 음성 → WebM)...', 62);
+    setSt('<span class="spin">⟳</span> 영상 렌더링 중...', 62);
     videoBlob = await renderVideo(script, ttsBuffers);
     if(stopFlag) throw new Error('중지됨');
     if(videoBlob){
       videoUrl=URL.createObjectURL(videoBlob);
-      setSt('✅ 완료! 미리보기 또는 다운로드하세요.', 100);
+      setProg(100, '완료');
       document.getElementById('btn-dl').disabled=false;
+
+      // 다 만들어졌으면 바로 받아 둔다. 눌러서 받는 것도 그대로 둔다.
+      if(document.getElementById('chk-autodl')?.checked){
+        downloadVideo();
+        setSt('✅ 완료! 다운로드 폴더에 저장했습니다.', 100);
+      } else {
+        setSt('✅ 완료! 미리보기 또는 다운로드하세요.', 100);
+      }
     }
     if(script.hashtags?.length)
       document.getElementById('hashtags').textContent=script.hashtags.join(' ');
@@ -865,9 +879,17 @@ async function renderVideo(script, ttsBuffers={}){
     // Canvas 프레임 렌더링
     let frame=0;
     const iv=setInterval(()=>{
-      if(stopFlag||frame>=totalFrames){ clearInterval(iv); recorder.stop(); return }
+      if(stopFlag||frame>=totalFrames){
+        clearInterval(iv);
+        setProg(97, '영상 마무리 중... 100%');   // 녹화를 닫는 동안
+        recorder.stop();
+        return;
+      }
       drawFrame((frame/fps)*1000); frame++;
-      setProg(62+(frame/totalFrames)*35,`영상 렌더링 ${Math.round(62+(frame/totalFrames)*35)}%`);
+      // 막대는 전체 공정의 62~97 구간을 쓰지만, 숫자는 이 단계의 진행률을 보여준다.
+      // 예전엔 둘 다 62+35 로 계산해 다 끝나도 97%로 보였다.
+      const pct = Math.min(100, Math.round((frame/totalFrames)*100));
+      setProg(62+(frame/totalFrames)*35, `영상 렌더링 ${pct}%`);
     },1000/fps);
   });
 }
@@ -1178,6 +1200,15 @@ function stopPreview(){
 }
 
 // ── 다운로드 ─────────────────────────────────────────────────
+/** 자동 저장 설정을 기억한다 */
+function saveAutoDl(on){ try{ localStorage.setItem('reel_autodl', on ? '1' : '0') }catch(e){} }
+(function initAutoDl(){
+  try{
+    const v = localStorage.getItem('reel_autodl');
+    if(v === '0'){ const c = document.getElementById('chk-autodl'); if(c) c.checked = false; }
+  }catch(e){}
+})();
+
 function downloadVideo(){
   if(!videoUrl) return;
   const ext=videoBlob.type.includes('mp4')?'mp4':'webm';
