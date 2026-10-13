@@ -210,9 +210,13 @@ textarea::placeholder, input[type="text"]::placeholder { color: var(--text-muted
 }
 .stage-alert-retry:hover { background: var(--red); color: #fff; }
 
-/* 작성 중인 탭은 깜빡이고, 실패한 탭은 빨갛게 둔다 */
-.output-tab.running { color: var(--purple); animation: pulse 1.5s ease-in-out infinite; }
-.output-tab.failed { color: var(--red); }
+/* 같은 줄을 진행 표시에도 쓴다. 이때는 경고색 대신 보라색. */
+.stage-alert.working {
+  background: var(--purple-soft); border-color: var(--purple);
+}
+.stage-alert.working .stage-alert-msg {
+  color: var(--purple); animation: pulse 1.5s ease-in-out infinite;
+}
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
@@ -728,19 +732,18 @@ textarea::placeholder, input[type="text"]::placeholder { color: var(--text-muted
        같은 정보를 두 번 보여주고 있었다. 다만 오류 메시지와 재시도 버튼이
        카드 안에만 있었어서, 그건 이 한 줄로 옮겼다. 문제가 있을 때만 뜬다. -->
   <div class="stage-alert hidden" id="stage-alert">
-    <span class="stage-alert-icon">⚠️</span>
+    <span class="stage-alert-icon" id="stage-alert-icon">⚠️</span>
     <span class="stage-alert-msg" id="stage-alert-msg"></span>
     <button class="stage-alert-retry hidden" id="stage-alert-retry">↺ 여기서 재시도</button>
   </div>
 
   <!-- Output Area -->
   <div class="output-section">
+    <!-- Researcher·Planner·Writer·Reviewer·Publisher 탭 5개를 걷어냈다.
+         AI 가 거치는 내부 단계 이름이라 볼 일이 없다. 다만 최종 캡션과
+         해시태그가 Publisher 탭에만 있었어서, 그건 [완성 캡션]으로 남긴다. -->
     <div class="output-tabs">
-      <button class="output-tab active" id="tab-researcher" onclick="switchTab('researcher')">🔍 Researcher</button>
-      <button class="output-tab" id="tab-planner" onclick="switchTab('planner')">📋 Planner</button>
-      <button class="output-tab" id="tab-writer" onclick="switchTab('writer')">✍️ Writer</button>
-      <button class="output-tab" id="tab-reviewer" onclick="switchTab('reviewer')">✅ Reviewer</button>
-      <button class="output-tab" id="tab-publisher" onclick="switchTab('publisher')">📤 Publisher</button>
+      <button class="output-tab active" id="tab-final" onclick="switchTab('final')">📝 완성 캡션</button>
       <button class="output-tab" id="tab-cardnews" onclick="switchTab('cardnews')">🖼️ 카드뉴스</button>
       <div style="margin-left:auto;display:flex;align-items:center;gap:6px;padding:0 12px">
         <button class="btn-copy" id="btn-copy-tab" onclick="copyCurrentTab()" style="display:none;font-size:12px;padding:5px 12px">📋 복사</button>
@@ -1106,25 +1109,29 @@ function handleEvent(ev) {
       break;
     case 'stage_start':
       setStageStatus(ev.stage, 'running');
-      switchTab(ev.stage);
       stageOutputs[ev.stage] = '';
-      renderOutput(ev.stage, '', true);
+      // 최종 단계에 들어서면 글이 쌓이는 걸 보여준다.
+      // 앞 단계는 내부 작업이라 진행 줄로만 알린다.
+      if (ev.stage === FINAL_STAGE) { switchTab('final'); renderOutput(ev.stage, '', true); }
       break;
     case 'stage_skip':
       stageOutputs[ev.stage] = ev.content;
       completedStages.add(ev.stage);
       setStageStatus(ev.stage, 'complete');
-      document.getElementById(`tab-${ev.stage}`).classList.add('done');
       break;
     case 'chunk':
       stageOutputs[ev.stage] = (stageOutputs[ev.stage] || '') + ev.text;
-      renderOutput(ev.stage, stageOutputs[ev.stage], true);
+      // 지금 보고 있는 탭이 [완성 캡션]이고, 그 내용이 이 단계에서 오는 중일 때만 그린다
+      if (activeTab === 'final' && ev.stage === finalStageId()) {
+        renderOutput(ev.stage, stageOutputs[ev.stage], true);
+      }
       break;
     case 'stage_complete':
       completedStages.add(ev.stage);
       setStageStatus(ev.stage, 'complete');
-      document.getElementById(`tab-${ev.stage}`).classList.add('done');
-      renderOutput(ev.stage, stageOutputs[ev.stage], false);
+      if (activeTab === 'final' && ev.stage === finalStageId()) {
+        renderOutput(ev.stage, stageOutputs[ev.stage], false);
+      }
       break;
     case 'stage_retry':
       setStageStatus(ev.stage, 'running');
@@ -1142,7 +1149,8 @@ function handleEvent(ev) {
       document.getElementById('btn-start').disabled = false;
       document.getElementById('btn-reset').classList.remove('hidden');
       igItemsInitialized = false; // 새 파이프라인 결과로 초기화
-      switchTab('publisher');
+      hideStageAlert();
+      switchTab('final');
       if (es) es.close();
       break;
   }
@@ -1153,35 +1161,50 @@ function handleEvent(ev) {
 // 단계 카드를 걷어낸 뒤로, 진행 상태는 출력 탭이 맡는다.
 // 작성 중인 단계는 탭에 ⚡ 가 붙고, 끝나면 done 표시(✓)가 남는다.
 
+// 단계별 카드도 탭도 없앴으므로, 어디까지 왔는지는 이 한 줄이 알린다.
+// 이름은 AI 내부 단계명(Researcher…) 대신 사람이 알아볼 말로 바꿨다.
 const STAGE_LABEL = {
-  researcher: 'Researcher', planner: 'Planner', writer: 'Writer',
-  reviewer: 'Reviewer', publisher: 'Publisher'
+  researcher: '자료 조사',
+  planner:    '구성 짜기',
+  writer:     '캡션 쓰기',
+  reviewer:   '다듬기',
+  publisher:  '해시태그·마무리'
 };
 
 function hideStageAlert() {
   const box = document.getElementById('stage-alert');
   if (!box) return;
   box.classList.add('hidden');
+  box.classList.remove('working');
   document.getElementById('stage-alert-retry').classList.add('hidden');
 }
 
+/** 진행 중인 단계를 "3/5 캡션 쓰기…" 로 보여준다 */
+function showStageProgress(stageId) {
+  const box = document.getElementById('stage-alert');
+  if (!box) return;
+  const step = STAGES.indexOf(stageId) + 1;
+  const name = STAGE_LABEL[stageId] || stageId;
+  document.getElementById('stage-alert-icon').textContent = '⏳';
+  document.getElementById('stage-alert-msg').textContent =
+    `${step}/${STAGES.length} ${name} 중...`;
+  document.getElementById('stage-alert-retry').classList.add('hidden');
+  box.classList.add('working');
+  box.classList.remove('hidden');
+}
+
 function setStageStatus(stageId, status) {
-  const tab = document.getElementById(`tab-${stageId}`);
-  if (tab) {
-    tab.classList.toggle('running', status === 'running');
-    tab.classList.toggle('failed', status === 'error');
-    if (status === 'complete') tab.classList.add('done');
-  }
-  // 새로 돌리기 시작하면 이전 오류는 치운다
-  if (status === 'running') hideStageAlert();
+  if (status === 'running') showStageProgress(stageId);
+  else if (status === 'complete' && stageId === STAGES[STAGES.length - 1]) hideStageAlert();
 }
 
 function showStageError(stageId, msg, showRetry) {
   const box = document.getElementById('stage-alert');
   if (!box) return;
   const name = STAGE_LABEL[stageId] || stageId;
+  document.getElementById('stage-alert-icon').textContent = '⚠️';
   document.getElementById('stage-alert-msg').textContent = `${name} 단계 — ${msg}`;
-  box.classList.remove('hidden');
+  box.classList.remove('hidden', 'working');
 
   const btn = document.getElementById('stage-alert-retry');
   if (showRetry) {
@@ -1194,10 +1217,6 @@ function showStageError(stageId, msg, showRetry) {
 
 function resetStageCards() {
   hideStageAlert();
-  STAGES.forEach(s => {
-    const tab = document.getElementById(`tab-${s}`);
-    if (tab) tab.classList.remove('done', 'running', 'failed');
-  });
 }
 
 function resetAll() {
@@ -1210,7 +1229,7 @@ function resetAll() {
   currentJobId = null;
   igItems = [];
   igItemsInitialized = false;
-  switchTab('researcher');
+  switchTab('final');
   document.getElementById('output-body').innerHTML = `
     <div class="output-empty">
       <div class="empty-icon">✨</div>
@@ -1220,23 +1239,35 @@ function resetAll() {
 
 // ─── Tab & Output ────────────────────────────────────────────────────────────
 
-function switchTab(stageId) {
-  activeTab = stageId;
-  const allTabs = [...STAGES, 'cardnews'];
-  allTabs.forEach(s => {
-    const el = document.getElementById(`tab-${s}`);
-    if (el) el.classList.toggle('active', s === stageId);
+// 화면에 남은 탭은 둘뿐이다. 파이프라인은 뒤에서 5단계를 그대로 돈다.
+const FINAL_STAGE = 'publisher';   // 최종 캡션·해시태그가 나오는 단계
+const FINAL_FALLBACK = 'reviewer'; // Publisher 가 실패했을 때 그나마 쓸 만한 것
+
+/** [완성 캡션] 탭에 보여줄 내용 */
+function finalContent() {
+  return stageOutputs[FINAL_STAGE] || stageOutputs[FINAL_FALLBACK] || '';
+}
+/** 그 내용이 어느 단계에서 온 것인지 (복사·렌더링에 쓴다) */
+function finalStageId() {
+  return stageOutputs[FINAL_STAGE] ? FINAL_STAGE : FINAL_FALLBACK;
+}
+
+function switchTab(tabId) {
+  activeTab = tabId;
+  ['final', 'cardnews'].forEach(t => {
+    const el = document.getElementById(`tab-${t}`);
+    if (el) el.classList.toggle('active', t === tabId);
   });
 
-  // 카드뉴스 탭 특별 처리
-  if (stageId === 'cardnews') {
-    document.getElementById('btn-copy-tab').style.display = 'none';
+  const copyBtn = document.getElementById('btn-copy-tab');
+
+  if (tabId === 'cardnews') {
+    copyBtn.style.display = 'none';
     document.getElementById('output-body').innerHTML = renderCardNews();
     return;
   }
 
-  const content = stageOutputs[stageId];
-  const copyBtn = document.getElementById('btn-copy-tab');
+  const content = finalContent();
   if (!content) {
     copyBtn.style.display = 'none';
     document.getElementById('output-body').innerHTML = `
@@ -1248,13 +1279,13 @@ function switchTab(stageId) {
     copyBtn.style.display = 'block';
     copyBtn.textContent = '📋 복사';
     copyBtn.classList.remove('copied');
-    renderOutput(stageId, content, false);
+    renderOutput(finalStageId(), content, false);
   }
 }
 
 
 function copyCurrentTab() {
-  const content = stageOutputs[activeTab];
+  const content = activeTab === 'final' ? finalContent() : stageOutputs[activeTab];
   if (!content) return;
   navigator.clipboard.writeText(content).then(() => {
     const btn = document.getElementById('btn-copy-tab');
@@ -1265,7 +1296,9 @@ function copyCurrentTab() {
 }
 
 function renderOutput(stageId, content, streaming) {
-  if (activeTab !== stageId) return;
+  // 탭 이름(final)과 단계 이름(publisher)이 달라졌다.
+  // [완성 캡션] 탭이 열려 있고 그 내용을 대는 단계일 때만 그린다.
+  if (!(activeTab === 'final' && stageId === finalStageId())) return;
   const body = document.getElementById('output-body');
   const copyBtn = document.getElementById('btn-copy-tab');
   if (content) {
