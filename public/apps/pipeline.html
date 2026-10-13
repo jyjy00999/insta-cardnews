@@ -191,65 +191,28 @@ textarea::placeholder, input[type="text"]::placeholder { color: var(--text-muted
 .btn-secondary:hover { border-color: var(--purple); color: var(--purple); }
 
 /* ── Pipeline ── */
-.pipeline-label {
-  font-size: 12px; font-weight: 600; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: .05em;
-  margin-bottom: 12px;
+/* 단계 카드 5개를 걷어냈다. 진행 상태는 출력 탭이 보여주고,
+   오류만 이 한 줄로 알린다. 문제가 없으면 아무것도 뜨지 않는다. */
+.stage-alert {
+  display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 20px; padding: 12px 14px;
+  background: var(--red-soft); border: 1px solid var(--red);
+  border-radius: var(--radius); font-size: 13px; line-height: 1.5;
 }
-.pipeline {
-  display: flex; gap: 10px; margin-bottom: 28px; flex-wrap: wrap;
-}
-.stage-card {
-  flex: 1; min-width: 160px; background: var(--surface);
-  border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 16px; box-shadow: var(--shadow); position: relative;
-  transition: border-color .2s, box-shadow .2s;
-}
-.stage-card.running {
-  border-color: var(--purple);
-  box-shadow: 0 0 0 3px rgba(131,58,180,.12), var(--shadow);
-}
-.stage-card.complete { border-color: var(--green); }
-.stage-card.error { border-color: var(--red); }
-
-.stage-icon { font-size: 22px; margin-bottom: 8px; }
-.stage-name { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
-.stage-desc { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; }
-.stage-status {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 11px; font-weight: 600; padding: 3px 8px;
-  border-radius: 20px; background: var(--surface2);
-  color: var(--text-muted);
-}
-.stage-status.running {
-  background: var(--purple-soft); color: var(--purple);
-  animation: pulse 1.5s ease-in-out infinite;
-}
-.stage-status.complete { background: var(--green-soft); color: var(--green); }
-.stage-status.error { background: var(--red-soft); color: var(--red); }
-
-.stage-errmsg {
-  margin-top: 8px; font-size: 11px; color: var(--red);
-  background: var(--red-soft); border-radius: 6px;
-  padding: 6px 8px; line-height: 1.4;
-}
-.stage-retry-btn {
-  margin-top: 8px; padding: 5px 10px;
+.stage-alert-icon { flex: none; }
+.stage-alert-msg { flex: 1; min-width: 0; color: var(--red); font-weight: 600; white-space: pre-wrap; }
+.stage-alert-retry {
+  flex: none; padding: 6px 12px;
   border: 1px solid var(--red); border-radius: var(--radius-sm);
-  background: none; color: var(--red); font-size: 11px;
-  font-family: inherit; cursor: pointer; font-weight: 600;
+  background: none; color: var(--red); font-size: 12px;
+  font-family: inherit; cursor: pointer; font-weight: 700;
   transition: all .15s;
 }
-.stage-retry-btn:hover { background: var(--red-soft); }
+.stage-alert-retry:hover { background: var(--red); color: #fff; }
 
-.stage-progress {
-  position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
-  border-radius: 0 0 var(--radius) var(--radius); overflow: hidden;
-}
-.stage-progress-bar {
-  height: 100%; background: var(--grad); width: 0%;
-  transition: width .3s ease;
-}
+/* 작성 중인 탭은 깜빡이고, 실패한 탭은 빨갛게 둔다 */
+.output-tab.running { color: var(--purple); animation: pulse 1.5s ease-in-out infinite; }
+.output-tab.failed { color: var(--red); }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
@@ -441,8 +404,6 @@ textarea::placeholder, input[type="text"]::placeholder { color: var(--text-muted
 /* Mobile */
 @media (max-width: 700px) {
   main { padding: 16px 16px 60px; }
-  .pipeline { flex-direction: column; }
-  .stage-card { min-width: unset; }
   .form-row { flex-direction: column; }
   header { padding: 0 16px; }
 }
@@ -763,54 +724,13 @@ textarea::placeholder, input[type="text"]::placeholder { color: var(--text-muted
     </div>
   </div>
 
-  <!-- Pipeline Stages -->
-  <div class="pipeline-label">🔄 파이프라인</div>
-  <div class="pipeline" id="pipeline">
-    <div class="stage-card" id="card-researcher">
-      <div class="stage-icon">🔍</div>
-      <div class="stage-name">Researcher</div>
-      <div class="stage-desc">주제 & 타겟 분석</div>
-      <span class="stage-status" id="status-researcher">대기</span>
-      <div class="stage-errmsg hidden" id="errmsg-researcher"></div>
-      <button class="stage-retry-btn hidden" id="retry-researcher" onclick="retryFrom('researcher')">↺ 여기서 재시도</button>
-      <div class="stage-progress"><div class="stage-progress-bar" id="prog-researcher"></div></div>
-    </div>
-    <div class="stage-card" id="card-planner">
-      <div class="stage-icon">📋</div>
-      <div class="stage-name">Planner</div>
-      <div class="stage-desc">포스트 구조 설계</div>
-      <span class="stage-status" id="status-planner">대기</span>
-      <div class="stage-errmsg hidden" id="errmsg-planner"></div>
-      <button class="stage-retry-btn hidden" id="retry-planner" onclick="retryFrom('planner')">↺ 여기서 재시도</button>
-      <div class="stage-progress"><div class="stage-progress-bar" id="prog-planner"></div></div>
-    </div>
-    <div class="stage-card" id="card-writer">
-      <div class="stage-icon">✍️</div>
-      <div class="stage-name">Writer</div>
-      <div class="stage-desc">캡션 & 슬라이드 작성</div>
-      <span class="stage-status" id="status-writer">대기</span>
-      <div class="stage-errmsg hidden" id="errmsg-writer"></div>
-      <button class="stage-retry-btn hidden" id="retry-writer" onclick="retryFrom('writer')">↺ 여기서 재시도</button>
-      <div class="stage-progress"><div class="stage-progress-bar" id="prog-writer"></div></div>
-    </div>
-    <div class="stage-card" id="card-reviewer">
-      <div class="stage-icon">✅</div>
-      <div class="stage-name">Reviewer</div>
-      <div class="stage-desc">검토 & 완성</div>
-      <span class="stage-status" id="status-reviewer">대기</span>
-      <div class="stage-errmsg hidden" id="errmsg-reviewer"></div>
-      <button class="stage-retry-btn hidden" id="retry-reviewer" onclick="retryFrom('reviewer')">↺ 여기서 재시도</button>
-      <div class="stage-progress"><div class="stage-progress-bar" id="prog-reviewer"></div></div>
-    </div>
-    <div class="stage-card" id="card-publisher">
-      <div class="stage-icon">📤</div>
-      <div class="stage-name">Publisher</div>
-      <div class="stage-desc">해시태그 & 게시 패키지</div>
-      <span class="stage-status" id="status-publisher">대기</span>
-      <div class="stage-errmsg hidden" id="errmsg-publisher"></div>
-      <button class="stage-retry-btn hidden" id="retry-publisher" onclick="retryFrom('publisher')">↺ 여기서 재시도</button>
-      <div class="stage-progress"><div class="stage-progress-bar" id="prog-publisher"></div></div>
-    </div>
+  <!-- 단계 카드 5개는 걷어냈다. 아래 출력 탭에 이미 진행 상태(✓)가 뜨므로
+       같은 정보를 두 번 보여주고 있었다. 다만 오류 메시지와 재시도 버튼이
+       카드 안에만 있었어서, 그건 이 한 줄로 옮겼다. 문제가 있을 때만 뜬다. -->
+  <div class="stage-alert hidden" id="stage-alert">
+    <span class="stage-alert-icon">⚠️</span>
+    <span class="stage-alert-msg" id="stage-alert-msg"></span>
+    <button class="stage-alert-retry hidden" id="stage-alert-retry">↺ 여기서 재시도</button>
   </div>
 
   <!-- Output Area -->
@@ -1230,46 +1150,53 @@ function handleEvent(ev) {
 
 // ─── Stage Card UI ───────────────────────────────────────────────────────────
 
+// 단계 카드를 걷어낸 뒤로, 진행 상태는 출력 탭이 맡는다.
+// 작성 중인 단계는 탭에 ⚡ 가 붙고, 끝나면 done 표시(✓)가 남는다.
+
+const STAGE_LABEL = {
+  researcher: 'Researcher', planner: 'Planner', writer: 'Writer',
+  reviewer: 'Reviewer', publisher: 'Publisher'
+};
+
+function hideStageAlert() {
+  const box = document.getElementById('stage-alert');
+  if (!box) return;
+  box.classList.add('hidden');
+  document.getElementById('stage-alert-retry').classList.add('hidden');
+}
+
 function setStageStatus(stageId, status) {
-  const card = document.getElementById(`card-${stageId}`);
-  const badge = document.getElementById(`status-${stageId}`);
-  card.className = `stage-card ${status}`;
-  const labels = { running: '⚡ 작성 중', complete: '✓ 완료', error: '✗ 오류' };
-  badge.textContent = labels[status] || '대기';
-  badge.className = `stage-status ${status}`;
-  // progress bar animation
-  const bar = document.getElementById(`prog-${stageId}`);
-  if (status === 'running') { bar.style.width = '60%'; bar.style.transition = 'width 15s ease'; }
-  else if (status === 'complete') { bar.style.width = '100%'; bar.style.transition = 'width .3s'; }
-  else { bar.style.width = '0%'; }
-  // hide retry button on new run
-  if (status === 'running') {
-    document.getElementById(`retry-${stageId}`).classList.add('hidden');
-    const errmsg = document.getElementById(`errmsg-${stageId}`);
-    errmsg.classList.add('hidden');
-    errmsg.textContent = '';
+  const tab = document.getElementById(`tab-${stageId}`);
+  if (tab) {
+    tab.classList.toggle('running', status === 'running');
+    tab.classList.toggle('failed', status === 'error');
+    if (status === 'complete') tab.classList.add('done');
   }
+  // 새로 돌리기 시작하면 이전 오류는 치운다
+  if (status === 'running') hideStageAlert();
 }
 
 function showStageError(stageId, msg, showRetry) {
-  const errmsg = document.getElementById(`errmsg-${stageId}`);
-  errmsg.textContent = msg;
-  errmsg.classList.remove('hidden');
+  const box = document.getElementById('stage-alert');
+  if (!box) return;
+  const name = STAGE_LABEL[stageId] || stageId;
+  document.getElementById('stage-alert-msg').textContent = `${name} 단계 — ${msg}`;
+  box.classList.remove('hidden');
+
+  const btn = document.getElementById('stage-alert-retry');
   if (showRetry) {
-    document.getElementById(`retry-${stageId}`).classList.remove('hidden');
+    btn.classList.remove('hidden');
+    btn.onclick = () => { hideStageAlert(); retryFrom(stageId); };
+  } else {
+    btn.classList.add('hidden');
   }
 }
 
 function resetStageCards() {
+  hideStageAlert();
   STAGES.forEach(s => {
-    const card = document.getElementById(`card-${s}`);
-    card.className = 'stage-card';
-    document.getElementById(`status-${s}`).textContent = '대기';
-    document.getElementById(`status-${s}`).className = 'stage-status';
-    document.getElementById(`errmsg-${s}`).classList.add('hidden');
-    document.getElementById(`retry-${s}`).classList.add('hidden');
-    document.getElementById(`prog-${s}`).style.width = '0%';
-    document.getElementById(`tab-${s}`).classList.remove('done');
+    const tab = document.getElementById(`tab-${s}`);
+    if (tab) tab.classList.remove('done', 'running', 'failed');
   });
 }
 
