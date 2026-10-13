@@ -285,9 +285,29 @@ textarea::placeholder, input[type="text"]::placeholder { color: var(--text-muted
   border: 2px dashed var(--border); border-radius: var(--radius);
   color: var(--text-soft); font-size: 14px; display: grid; gap: 8px; justify-items: center;
 }
-.sp-result { margin-top: 18px; display: grid; gap: 12px; justify-items: center; }
-.sp-result img { width: 100%; max-width: 520px; border-radius: var(--radius); box-shadow: var(--shadow); display: block; }
-.sp-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+/* 6장을 나란히 보여준다 */
+.sp-results {
+  margin-top: 18px; display: grid; gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+.sp-card {
+  display: grid; gap: 10px; justify-items: center;
+  padding: 12px; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--surface);
+}
+.sp-card-head { font-size: 13px; font-weight: 700; color: var(--text-soft); }
+.sp-card img { width: 100%; border-radius: 10px; box-shadow: var(--shadow); display: block; }
+.sp-card-fail { border-color: var(--red); background: var(--red-soft); }
+.sp-fail { font-size: 12.5px; color: var(--red); text-align: center; line-height: 1.5; padding: 24px 8px; }
+.sp-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.sp-mini { padding: 8px 14px; font-size: 12.5px; }
+.sp-all { width: 100%; margin-top: 16px; }
+.sp-note {
+  margin-bottom: 12px; padding: 11px 14px; border-radius: var(--radius);
+  background: #FFF6E5; border: 1px solid #F0C36D; color: #7A5A12;
+  font-size: 12.5px; line-height: 1.6;
+}
+.sp-note a { color: #B45309; font-weight: 700; }
 @keyframes spin { to { transform: rotate(360deg) } }
 
 /* 탭 대신 지금 무엇을 보고 있는지 알려주는 제목 */
@@ -2655,9 +2675,11 @@ async function loadModels() {
 
 const SP_FONT = '"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif';
 let spTemplate = localStorage.getItem('ig_sp_template') || 'rank';
-let spData = null;        // AI 가 만들어 준 구조화 데이터
-let spImgUrl = '';        // 그려 놓은 결과
+// 템플릿별 결과를 따로 들고 있는다. { rank: {data, img} | {error}, ... }
+// 하나가 실패해도 나머지는 그대로 쓸 수 있어야 한다.
+let spResults = {};
 let spBusy = false;
+let spProgress = '';
 
 /** 둥근 사각형 */
 function spRect(ctx, x, y, w, h, r, fill, stroke, lw) {
@@ -2946,32 +2968,57 @@ function renderSinglePost() {
       <b>${t.name}</b><span>${t.desc}</span>
     </button>`).join('');
 
-  const result = spImgUrl
-    ? `<div class="sp-result">
-         <img src="${spImgUrl}" alt="단일 포스트">
-         <div class="sp-actions">
-           <button class="sp-btn-ghost" onclick="spGenerate()" ${spBusy ? 'disabled' : ''}>🔄 다시 만들기</button>
-           <button class="sp-btn" onclick="spDownload()">⬇️ 저장</button>
-         </div>
-       </div>`
+  const done = Object.keys(spResults).length;
+  const results = Object.entries(SP_TEMPLATES).map(([id, t]) => {
+    const r = spResults[id];
+    if (!r) return '';
+    if (r.error) {
+      return `<div class="sp-card sp-card-fail">
+                <div class="sp-card-head">${t.name}</div>
+                <div class="sp-fail">${escHtml(r.error.split('\n')[0])}</div>
+                <button class="sp-btn-ghost sp-mini" onclick="spRetryOne('${id}')">↺ 이것만 다시</button>
+              </div>`;
+    }
+    return `<div class="sp-card">
+              <div class="sp-card-head">${t.name}</div>
+              <img src="${r.img}" alt="${t.name}">
+              <div class="sp-actions">
+                <button class="sp-btn-ghost sp-mini" onclick="spRetryOne('${id}')">↺ 다시</button>
+                <button class="sp-btn sp-mini" onclick="spDownload('${id}')">⬇️ 저장</button>
+              </div>
+            </div>`;
+  }).join('');
+
+  const body = done
+    ? `<div class="sp-results">${results}</div>
+       ${done === Object.keys(SP_TEMPLATES).length && !spBusy
+          ? '<button class="sp-btn-ghost sp-all" onclick="spDownloadAll()">⬇️ 6장 모두 저장</button>' : ''}`
     : `<div class="sp-empty">
          <div style="font-size:40px">🖼️</div>
-         <div>형태를 고르고 <strong>카드 만들기</strong>를 누르세요.</div>
-         <div style="font-size:12px;color:var(--text-muted)">주제에 맞는 내용을 AI 가 채워 넣습니다.</div>
+         <div><strong>카드 만들기</strong>를 누르면 6가지 형태를 모두 만듭니다.</div>
+         <div style="font-size:12px;color:var(--text-muted)">마음에 드는 걸 골라 저장하세요.</div>
        </div>`;
 
   // 그려 넣은 뒤에 미리보기 캔버스를 채운다
   setTimeout(spPaintThumbs, 0);
 
+  // 키 없이 6장을 뽑으면 한 장에 몇 분씩 걸려 거의 못 쓴다. 미리 알린다.
+  const noKeyNote = (apiKey || '').trim() ? '' : `
+    <div class="sp-note">
+      ⚠️ API 키가 없으면 한 장당 1분 이상 걸리고 자주 실패합니다.
+      <a href="https://console.groq.com/keys" target="_blank">무료 Groq 키</a>를 ⚙️ 설정에 넣으면 6장이 1분 안에 나옵니다.
+    </div>`;
+
   return `
     <div class="sp-wrap">
-      <div class="sp-label">카드 형태</div>
+      <div class="sp-label">카드 형태 — 6가지를 모두 만들어 보여줍니다</div>
       <div class="sp-grid">${picker}</div>
+      ${noKeyNote}
       <button class="sp-btn sp-make" onclick="spGenerate()" ${spBusy ? 'disabled' : ''}>
-        ${spBusy ? '<span class="sp-spin">⟳</span> 만드는 중...' : '✨ 카드 만들기'}
+        ${spBusy ? `<span class="sp-spin">⟳</span> ${escHtml(spProgress)}` : '✨ 카드 만들기 (6가지)'}
       </button>
       <div id="sp-err" class="sp-err" style="display:none"></div>
-      ${result}
+      ${body}
     </div>`;
 }
 
@@ -2999,38 +3046,95 @@ function spPaintThumbs() {
 function spSetTemplate(id) {
   spTemplate = id;
   try { localStorage.setItem('ig_sp_template', id); } catch (e) {}
-  // 이미 데이터가 있으면 API 를 다시 부르지 않고 다시 그리기만 한다
-  if (spData) { try { spImgUrl = spRender(spData, id); } catch (e) {} }
   renderOutputArea();
 }
 
-async function spGenerate() {
-  const topic = document.getElementById('topic').value.trim();
-  if (!topic) { alert('주제를 입력해주세요.'); return; }
-  spBusy = true; renderOutputArea();
+// 한 장이 오래 끌면 나머지가 통째로 묶인다. 키 없이 Pollinations 로 가면
+// 한 번에 몇 분씩 걸리기도 해서, 일정 시간이 지나면 끊고 다음으로 넘어간다.
+const SP_TIMEOUT_MS = 75000;
 
+/** 한 종류를 받아 그린다. 실패하면 그 사실을 결과에 남긴다. */
+async function spBuildOne(topic, id) {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), SP_TIMEOUT_MS);
   try {
     const r = await fetch('/api/pipeline/single-post', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, template: spTemplate, apiKey })
+      body: JSON.stringify({ topic, template: id, apiKey }),
+      signal: ac.signal
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
-    spData = data;
-    spImgUrl = spRender(data, spTemplate);
+    spResults[id] = { data, img: spRender(data, id) };
   } catch (e) {
-    spBusy = false; renderOutputArea();
-    const box = document.getElementById('sp-err');
-    if (box) { box.style.display = 'block'; box.textContent = e.message; }
-    return;
+    spResults[id] = {
+      error: e.name === 'AbortError'
+        ? '시간이 너무 걸려 건너뛰었습니다. ⚙️ 설정에 Groq 키를 넣으면 빨라집니다.'
+        : (e.message || '실패')
+    };
+  } finally {
+    clearTimeout(timer);
   }
-  spBusy = false; renderOutputArea();
 }
 
-function spDownload() {
-  if (!spImgUrl) return;
+/** 6가지를 차례로 만든다. 하나씩 끝날 때마다 화면에 더한다. */
+async function spGenerate() {
+  const topic = document.getElementById('topic').value.trim();
+  if (!topic) { alert('주제를 입력해주세요.'); return; }
+
+  const ids = Object.keys(SP_TEMPLATES);
+  spResults = {}; spBusy = true;
+
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    spProgress = `${i + 1}/${ids.length} ${SP_TEMPLATES[id].name} 만드는 중...`;
+    renderOutputArea();
+    await spBuildOne(topic, id);
+    renderOutputArea();                 // 완성되는 대로 바로 보여준다
+    // 무료 티어가 몰아치는 호출을 막으므로 사이를 띄운다
+    if (i < ids.length - 1) await new Promise(r => setTimeout(r, 900));
+  }
+
+  spBusy = false; spProgress = '';
+  renderOutputArea();
+
+  const failed = Object.values(spResults).filter(r => r.error).length;
+  if (failed) {
+    const box = document.getElementById('sp-err');
+    if (box) {
+      box.style.display = 'block';
+      box.textContent = `${ids.length - failed}장 완성, ${failed}장 실패했습니다. 실패한 것만 [↺ 다시]로 채울 수 있습니다.`;
+    }
+  }
+}
+
+/** 한 장만 다시 만든다 */
+async function spRetryOne(id) {
+  const topic = document.getElementById('topic').value.trim();
+  if (!topic) { alert('주제를 입력해주세요.'); return; }
+  spBusy = true; spProgress = `${SP_TEMPLATES[id].name} 다시 만드는 중...`;
+  renderOutputArea();
+  await spBuildOne(topic, id);
+  spBusy = false; spProgress = '';
+  renderOutputArea();
+}
+
+function spDownload(id) {
+  const r = spResults[id];
+  if (!r || !r.img) return;
   const a = document.createElement('a');
-  a.href = spImgUrl; a.download = `단일포스트_${Date.now()}.jpg`; a.click();
+  a.href = r.img;
+  a.download = `${SP_TEMPLATES[id].name.replace(/[^가-힣A-Za-z0-9]/g, '')}_${Date.now()}.jpg`;
+  a.click();
+}
+
+/** 완성된 것을 모두 내려받는다. 브라우저가 막지 않게 사이를 띄운다. */
+async function spDownloadAll() {
+  for (const id of Object.keys(SP_TEMPLATES)) {
+    if (!spResults[id] || !spResults[id].img) continue;
+    spDownload(id);
+    await new Promise(r => setTimeout(r, 400));
+  }
 }
 
 /** 고른 템플릿으로 한 장을 그린다 */
