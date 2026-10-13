@@ -246,6 +246,50 @@ textarea::placeholder, input[type="text"]::placeholder { color: var(--text-muted
 .output-tab.done { color: var(--text-soft); }
 .output-tab.done::after { content: ' ✓'; color: var(--green); font-size: 11px; }
 
+/* ── 단일 포스트 템플릿 ── */
+.sp-wrap { padding: 4px 0 8px; }
+.sp-label { font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 10px; letter-spacing: .04em; }
+.sp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.sp-tpl {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 10px 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); cursor: pointer; transition: .15s; font-family: inherit;
+}
+.sp-tpl:hover { border-color: var(--purple); }
+.sp-tpl.active { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(131,58,180,.14); }
+.sp-tpl canvas { width: 100%; max-width: 132px; aspect-ratio: 1; border-radius: 8px; background: #fff; border: 1px solid var(--border); }
+.sp-tpl b { font-size: 13px; color: var(--text); margin-top: 6px; }
+.sp-tpl span { font-size: 11px; color: var(--text-muted); }
+.sp-btn {
+  padding: 12px 22px; border: none; border-radius: var(--radius);
+  background: var(--grad); color: #fff; font-family: inherit;
+  font-size: 14px; font-weight: 700; cursor: pointer; transition: .15s;
+}
+.sp-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.sp-btn:disabled { opacity: .6; cursor: not-allowed; }
+.sp-make { width: 100%; }
+.sp-spin { display: inline-block; animation: spin .7s linear infinite; }
+.sp-btn-ghost {
+  padding: 12px 22px; border: 1.5px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--text); font-family: inherit;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.sp-btn-ghost:hover:not(:disabled) { border-color: var(--purple); color: var(--purple); }
+.sp-err {
+  margin-top: 12px; padding: 12px 14px; border-radius: var(--radius);
+  background: var(--red-soft); color: var(--red); font-size: 13px;
+  font-weight: 600; white-space: pre-wrap; line-height: 1.5;
+}
+.sp-empty {
+  margin-top: 16px; padding: 48px 20px; text-align: center;
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  color: var(--text-soft); font-size: 14px; display: grid; gap: 8px; justify-items: center;
+}
+.sp-result { margin-top: 18px; display: grid; gap: 12px; justify-items: center; }
+.sp-result img { width: 100%; max-width: 520px; border-radius: var(--radius); box-shadow: var(--shadow); display: block; }
+.sp-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+@keyframes spin { to { transform: rotate(360deg) } }
+
 /* 탭 대신 지금 무엇을 보고 있는지 알려주는 제목 */
 .output-label {
   padding: 12px 18px; font-size: 13px; font-weight: 700;
@@ -1079,6 +1123,13 @@ function renderOutputArea() {
     if (label) label.textContent = '🖼️ 카드뉴스';
     copyBtn.style.display = 'none';
     body.innerHTML = renderCardNews();
+    return;
+  }
+
+  if (postTypeKind === '단일 포스트') {
+    if (label) label.textContent = '🖼️ 단일 포스트';
+    copyBtn.style.display = 'none';
+    body.innerHTML = renderSinglePost();
     return;
   }
 
@@ -2597,6 +2648,401 @@ async function loadModels() {
   } catch(e) {
     document.getElementById('model-hint').textContent = '오류: ' + e.message;
   }
+}
+
+// ══ 단일 포스트 템플릿 ═══════════════════════════════════════════════════
+// 한 장짜리 인포그래픽. 순위표·TOP N·피라미드 같은 형태를 캔버스에 그린다.
+
+const SP_FONT = '"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif';
+let spTemplate = localStorage.getItem('ig_sp_template') || 'rank';
+let spData = null;        // AI 가 만들어 준 구조화 데이터
+let spImgUrl = '';        // 그려 놓은 결과
+let spBusy = false;
+
+/** 둥근 사각형 */
+function spRect(ctx, x, y, w, h, r, fill, stroke, lw) {
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 2; ctx.stroke(); }
+}
+
+/** 폭에 맞을 때까지 글자를 줄인다 */
+function spFit(ctx, text, maxW, startPx, weight, minPx) {
+  let s = startPx;
+  do {
+    ctx.font = `${weight} ${s}px ${SP_FONT}`;
+    if (ctx.measureText(text).width <= maxW) return s;
+    s -= 2;
+  } while (s > (minPx || 14));
+  return s;
+}
+
+/** 폭에 맞춰 줄바꿈 (한글은 글자 단위로도 끊는다) */
+function spWrap(ctx, text, maxW, maxLines) {
+  const words = String(text || '').split(' ');
+  const out = []; let cur = '';
+  for (const w of words) {
+    const t = cur ? cur + ' ' + w : w;
+    if (ctx.measureText(t).width <= maxW) { cur = t; continue; }
+    if (cur) { out.push(cur); cur = w; }
+    else {
+      let p = '';
+      for (const ch of w) {
+        if (ctx.measureText(p + ch).width > maxW) { out.push(p); p = ch; }
+        else p += ch;
+      }
+      cur = p;
+    }
+    if (maxLines && out.length >= maxLines) break;
+  }
+  if (cur && (!maxLines || out.length < maxLines)) out.push(cur);
+  return out.slice(0, maxLines || out.length);
+}
+
+/** 제목 띠 — 모든 템플릿이 같은 머리를 쓴다 */
+function spHeader(ctx, title, subtitle, theme) {
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const ts = spFit(ctx, title, 960, 76, '900', 40);
+  spRect(ctx, 540 - ctx.measureText(title).width / 2 - 34, 46, ctx.measureText(title).width + 68, ts + 34, 18, theme.titleBg);
+  ctx.fillStyle = theme.titleInk;
+  ctx.font = `900 ${ts}px ${SP_FONT}`;
+  ctx.fillText(title, 540, 46 + (ts + 34) / 2);
+
+  if (subtitle) {
+    ctx.font = `600 30px ${SP_FONT}`;
+    ctx.fillStyle = theme.sub;
+    ctx.fillText(subtitle, 540, 46 + ts + 34 + 30);
+    return 46 + ts + 34 + 58;
+  }
+  return 46 + ts + 34 + 26;
+}
+
+const SP_THEMES = {
+  rank:     { bg:'#FFF6DC', titleBg:'#FFC94A', titleInk:'#2B2112', sub:'#7A6845', card:'#FFFFFF', ink:'#2B2112', accent:'#E8590C', line:'#E8D6A8' },
+  topn:     { bg:'#0F2A4A', titleBg:'#FFFFFF', titleInk:'#0F2A4A', sub:'#A8C6E8', card:'#FFFFFF', ink:'#13293D', accent:'#1F7AE0', line:'#2A4A70' },
+  pyramid:  { bg:'#EAF0FF', titleBg:'#7B5CE6', titleInk:'#FFFFFF', sub:'#6B6A8A', card:'#FFFFFF', ink:'#23214A', accent:'#7B5CE6', line:'#C9D4F5' },
+  numbered: { bg:'#FFF1F4', titleBg:'#FF6B8A', titleInk:'#FFFFFF', sub:'#9A7080', card:'#FFFFFF', ink:'#3A2730', accent:'#FF6B8A', line:'#FFD3DD' },
+  compare:  { bg:'#F3F6FA', titleBg:'#2F3E55', titleInk:'#FFFFFF', sub:'#6B7A90', card:'#FFFFFF', ink:'#22303F', accent:'#2F80ED', line:'#D8E0EA' },
+  steps:    { bg:'#EEF9F2', titleBg:'#2FA36B', titleInk:'#FFFFFF', sub:'#5F8A74', card:'#FFFFFF', ink:'#1E3A2C', accent:'#2FA36B', line:'#CBE8D8' }
+};
+
+const SP_TEMPLATES = {
+  rank: {
+    name: '🏆 순위표', desc: '16칸 격자 순위',
+    render(ctx, d, T) {
+      const items = (d.items || []).slice(0, 16);
+      const top = spHeader(ctx, d.title || '', '', T);
+      const cols = 4, gap = 18;
+      const cw = (1080 - 64 - gap * (cols - 1)) / cols;
+      const rows = Math.ceil(items.length / cols) || 1;
+      const avail = 1040 - top;
+      const chh = Math.min(200, (avail - gap * (rows - 1)) / rows);
+
+      items.forEach((it, i) => {
+        const cx = 32 + (i % cols) * (cw + gap);
+        const cy = top + Math.floor(i / cols) * (chh + gap);
+        spRect(ctx, cx, cy, cw, chh, 16, T.card, T.line, 3);
+        // 순위 알약
+        const rank = `${it.rank || i + 1}위`;
+        ctx.font = `800 26px ${SP_FONT}`;
+        const rw = ctx.measureText(rank).width + 28;
+        spRect(ctx, cx + cw / 2 - rw / 2, cy + 12, rw, 40, 20, T.accent);
+        ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(rank, cx + cw / 2, cy + 32);
+        // 이름
+        const ls = spFit(ctx, it.label || '', cw - 24, 40, '900', 20);
+        ctx.fillStyle = T.ink; ctx.font = `900 ${ls}px ${SP_FONT}`;
+        ctx.fillText(it.label || '', cx + cw / 2, cy + chh / 2 + 14);
+        // 한마디
+        if (it.note) {
+          ctx.font = `600 20px ${SP_FONT}`; ctx.fillStyle = T.sub;
+          const l = spWrap(ctx, it.note, cw - 20, 2);
+          l.forEach((t, k) => ctx.fillText(t, cx + cw / 2, cy + chh - 34 + k * 24));
+        }
+      });
+    }
+  },
+
+  topn: {
+    name: '📊 TOP N', desc: '가로 막대 순위',
+    render(ctx, d, T) {
+      const items = (d.items || []).slice(0, 8);
+      const top = spHeader(ctx, d.title || '', d.subtitle || '', T);
+      const gap = 16;
+      const bh = Math.min(118, (1040 - top - gap * (items.length - 1)) / items.length);
+
+      items.forEach((it, i) => {
+        const y = top + i * (bh + gap);
+        spRect(ctx, 40, y, 1000, bh, 16, T.card);
+        // 번호
+        ctx.font = `900 ${Math.round(bh * 0.46)}px ${SP_FONT}`;
+        ctx.fillStyle = T.accent; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(it.n || i + 1), 102, y + bh / 2);
+        // 구분선
+        ctx.strokeStyle = T.line; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(158, y + 18); ctx.lineTo(158, y + bh - 18); ctx.stroke();
+        // 이름
+        ctx.textAlign = 'left';
+        const hasDesc = !!it.desc;
+        const ls = spFit(ctx, it.label || '', 820, Math.round(bh * 0.40), '900', 22);
+        ctx.fillStyle = T.ink; ctx.font = `900 ${ls}px ${SP_FONT}`;
+        ctx.fillText(it.label || '', 186, y + (hasDesc ? bh * 0.36 : bh / 2));
+        if (hasDesc) {
+          ctx.font = `600 24px ${SP_FONT}`; ctx.fillStyle = T.sub;
+          ctx.fillText(spWrap(ctx, it.desc, 820, 1)[0] || '', 186, y + bh * 0.72);
+        }
+      });
+    }
+  },
+
+  pyramid: {
+    name: '🔺 피라미드', desc: '꼭대기부터 순위',
+    render(ctx, d, T) {
+      const items = (d.items || []).slice(0, 14);
+      const top = spHeader(ctx, d.title || '', '', T);
+      const n = items.length || 1;
+      const botY = 1040, h = botY - top;
+      const rowH = h / n;
+
+      // 삼각형 바탕
+      ctx.beginPath();
+      ctx.moveTo(540, top); ctx.lineTo(980, botY); ctx.lineTo(100, botY); ctx.closePath();
+      ctx.fillStyle = '#DCE6FF'; ctx.fill();
+
+      items.forEach((it, i) => {
+        const y = top + i * rowH;
+        const t = (i + 0.5) / n;
+        const halfW = 30 + t * 410;
+        // 순위 칸
+        ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(540 - halfW, y + rowH); ctx.lineTo(540 + halfW, y + rowH); ctx.stroke();
+        ctx.font = `800 ${Math.min(30, rowH * 0.42)}px ${SP_FONT}`;
+        ctx.fillStyle = T.accent; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(`${it.rank || i + 1}위`, 540, y + rowH / 2);
+
+        // 좌우 번갈아 이름표 — 아래로 갈수록 삼각형이 넓어져 가장자리에 걸린다.
+        // 캔버스 안쪽으로 붙잡아 둔다.
+        const left = i % 2 === 0;
+        const lx = left
+          ? Math.max(126, 540 - halfW - 20)
+          : Math.min(954, 540 + halfW + 20);
+        ctx.textAlign = left ? 'right' : 'left';
+        const ls = Math.min(32, rowH * 0.44);
+        ctx.font = `900 ${ls}px ${SP_FONT}`;
+        ctx.fillStyle = T.ink;
+        ctx.fillText(it.label || '', lx, y + rowH / 2 - (it.tag ? 11 : 0));
+        if (it.tag) {
+          ctx.font = `700 ${Math.min(24, rowH * 0.34)}px ${SP_FONT}`;
+          ctx.fillStyle = T.accent;
+          ctx.fillText(it.tag, lx, y + rowH / 2 + 15);
+        }
+      });
+    }
+  },
+
+  numbered: {
+    name: '📋 번호 설명', desc: '번호 + 소제목 + 설명',
+    render(ctx, d, T) {
+      const items = (d.items || []).slice(0, 8);
+      const top = spHeader(ctx, d.title || '', d.subtitle || '', T);
+      const gap = 14;
+      const bh = Math.min(150, (1040 - top - gap * (items.length - 1)) / items.length);
+
+      items.forEach((it, i) => {
+        const y = top + i * (bh + gap);
+        spRect(ctx, 40, y, 1000, bh, 18, T.card);
+        // 번호 동그라미
+        ctx.beginPath(); ctx.arc(104, y + bh / 2, Math.min(34, bh * 0.28), 0, Math.PI * 2);
+        ctx.fillStyle = T.accent; ctx.fill();
+        ctx.font = `900 ${Math.min(32, bh * 0.26)}px ${SP_FONT}`;
+        ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(it.n || i + 1), 104, y + bh / 2);
+        // 소제목
+        ctx.textAlign = 'left';
+        ctx.font = `900 ${Math.min(36, bh * 0.28)}px ${SP_FONT}`;
+        ctx.fillStyle = T.ink;
+        ctx.fillText(it.head || '', 166, y + bh * 0.33);
+        // 설명
+        ctx.font = `500 25px ${SP_FONT}`; ctx.fillStyle = T.sub;
+        spWrap(ctx, it.body || '', 840, 2)
+          .forEach((t, k) => ctx.fillText(t, 166, y + bh * 0.63 + k * 31));
+      });
+    }
+  },
+
+  compare: {
+    name: '⚖️ 비교형', desc: '좌우 두 기둥',
+    render(ctx, d, T) {
+      const rows = (d.rows || []).slice(0, 8);
+      const top = spHeader(ctx, d.title || '', '', T);
+      const colW = 480, lx = 40, rx = 560;
+
+      // 기둥 제목
+      spRect(ctx, lx, top, colW, 70, 14, T.accent);
+      spRect(ctx, rx, top, colW, 70, 14, '#8A94A6');
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `900 32px ${SP_FONT}`;
+      ctx.fillText(d.leftTitle || '', lx + colW / 2, top + 35);
+      ctx.fillText(d.rightTitle || '', rx + colW / 2, top + 35);
+
+      const sy = top + 86, gap = 12;
+      const rh = Math.min(120, (1040 - sy - gap * (rows.length - 1)) / rows.length);
+      rows.forEach((r, i) => {
+        const y = sy + i * (rh + gap);
+        spRect(ctx, lx, y, colW, rh, 14, T.card, T.line, 2);
+        spRect(ctx, rx, y, colW, rh, 14, T.card, T.line, 2);
+        ctx.fillStyle = T.ink;
+        [[r.left, lx], [r.right, rx]].forEach(([txt, x]) => {
+          ctx.font = `700 27px ${SP_FONT}`;
+          const l = spWrap(ctx, txt || '', colW - 40, 2);
+          const oy = l.length > 1 ? -16 : 0;
+          l.forEach((t, k) => ctx.fillText(t, x + colW / 2, y + rh / 2 + oy + k * 33));
+        });
+      });
+    }
+  },
+
+  steps: {
+    name: '➡️ 단계 흐름', desc: '순서대로 따라가기',
+    render(ctx, d, T) {
+      const steps = (d.steps || []).slice(0, 6);
+      const top = spHeader(ctx, d.title || '', '', T);
+      const arrow = 46;
+      const bh = Math.min(180, (1040 - top - arrow * (steps.length - 1)) / steps.length);
+
+      steps.forEach((s, i) => {
+        const y = top + i * (bh + arrow);
+        spRect(ctx, 70, y, 940, bh, 20, T.card, T.line, 3);
+        // 단계 번호
+        spRect(ctx, 100, y + bh / 2 - 32, 64, 64, 16, T.accent);
+        ctx.font = `900 34px ${SP_FONT}`; ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(s.n || i + 1), 132, y + bh / 2);
+        // 글
+        ctx.textAlign = 'left'; ctx.fillStyle = T.ink;
+        ctx.font = `900 ${Math.min(38, bh * 0.24)}px ${SP_FONT}`;
+        ctx.fillText(s.head || '', 196, y + bh * 0.36);
+        ctx.font = `500 26px ${SP_FONT}`; ctx.fillStyle = T.sub;
+        spWrap(ctx, s.body || '', 780, 2)
+          .forEach((t, k) => ctx.fillText(t, 196, y + bh * 0.66 + k * 32));
+        // 화살표
+        if (i < steps.length - 1) {
+          const ay = y + bh + arrow / 2;
+          ctx.strokeStyle = T.accent; ctx.lineWidth = 6; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(540, ay - 13); ctx.lineTo(540, ay + 7); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(526, ay - 3); ctx.lineTo(540, ay + 11); ctx.lineTo(554, ay - 3); ctx.stroke();
+          ctx.lineCap = 'butt';
+        }
+      });
+    }
+  }
+};
+
+// ── 단일 포스트 화면 ──────────────────────────────────────────────────────
+function renderSinglePost() {
+  const picker = Object.entries(SP_TEMPLATES).map(([id, t]) => `
+    <button class="sp-tpl${id === spTemplate ? ' active' : ''}" onclick="spSetTemplate('${id}')">
+      <canvas id="sptc-${id}" width="132" height="132"></canvas>
+      <b>${t.name}</b><span>${t.desc}</span>
+    </button>`).join('');
+
+  const result = spImgUrl
+    ? `<div class="sp-result">
+         <img src="${spImgUrl}" alt="단일 포스트">
+         <div class="sp-actions">
+           <button class="sp-btn-ghost" onclick="spGenerate()" ${spBusy ? 'disabled' : ''}>🔄 다시 만들기</button>
+           <button class="sp-btn" onclick="spDownload()">⬇️ 저장</button>
+         </div>
+       </div>`
+    : `<div class="sp-empty">
+         <div style="font-size:40px">🖼️</div>
+         <div>형태를 고르고 <strong>카드 만들기</strong>를 누르세요.</div>
+         <div style="font-size:12px;color:var(--text-muted)">주제에 맞는 내용을 AI 가 채워 넣습니다.</div>
+       </div>`;
+
+  // 그려 넣은 뒤에 미리보기 캔버스를 채운다
+  setTimeout(spPaintThumbs, 0);
+
+  return `
+    <div class="sp-wrap">
+      <div class="sp-label">카드 형태</div>
+      <div class="sp-grid">${picker}</div>
+      <button class="sp-btn sp-make" onclick="spGenerate()" ${spBusy ? 'disabled' : ''}>
+        ${spBusy ? '<span class="sp-spin">⟳</span> 만드는 중...' : '✨ 카드 만들기'}
+      </button>
+      <div id="sp-err" class="sp-err" style="display:none"></div>
+      ${result}
+    </div>`;
+}
+
+/** 템플릿 버튼의 작은 견본 — 실제 그리는 코드로 만든다 */
+function spPaintThumbs() {
+  const SAMPLE = {
+    rank:     { title:'제목', items: Array.from({length:16},(_,i)=>({rank:i+1,label:'항목',note:''})) },
+    topn:     { title:'제목', items: Array.from({length:7},(_,i)=>({n:i+1,label:'항목',desc:'설명'})) },
+    pyramid:  { title:'제목', items: Array.from({length:10},(_,i)=>({rank:i+1,label:'항목',tag:''})) },
+    numbered: { title:'제목', items: Array.from({length:6},(_,i)=>({n:i+1,head:'소제목',body:'설명'})) },
+    compare:  { title:'제목', leftTitle:'왼쪽', rightTitle:'오른쪽', rows: Array.from({length:6},()=>({left:'내용',right:'내용'})) },
+    steps:    { title:'제목', steps: Array.from({length:4},(_,i)=>({n:i+1,head:'단계',body:'설명'})) }
+  };
+  for (const [id, t] of Object.entries(SP_TEMPLATES)) {
+    const c = document.getElementById(`sptc-${id}`); if (!c) continue;
+    const x = c.getContext('2d');
+    const T = SP_THEMES[id];
+    x.save(); x.scale(132 / 1080, 132 / 1080);
+    x.fillStyle = T.bg; x.fillRect(0, 0, 1080, 1080);
+    try { t.render(x, SAMPLE[id], T); } catch (e) { /* 견본은 실패해도 넘어간다 */ }
+    x.restore();
+  }
+}
+
+function spSetTemplate(id) {
+  spTemplate = id;
+  try { localStorage.setItem('ig_sp_template', id); } catch (e) {}
+  // 이미 데이터가 있으면 API 를 다시 부르지 않고 다시 그리기만 한다
+  if (spData) { try { spImgUrl = spRender(spData, id); } catch (e) {} }
+  renderOutputArea();
+}
+
+async function spGenerate() {
+  const topic = document.getElementById('topic').value.trim();
+  if (!topic) { alert('주제를 입력해주세요.'); return; }
+  spBusy = true; renderOutputArea();
+
+  try {
+    const r = await fetch('/api/pipeline/single-post', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, template: spTemplate, apiKey })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    spData = data;
+    spImgUrl = spRender(data, spTemplate);
+  } catch (e) {
+    spBusy = false; renderOutputArea();
+    const box = document.getElementById('sp-err');
+    if (box) { box.style.display = 'block'; box.textContent = e.message; }
+    return;
+  }
+  spBusy = false; renderOutputArea();
+}
+
+function spDownload() {
+  if (!spImgUrl) return;
+  const a = document.createElement('a');
+  a.href = spImgUrl; a.download = `단일포스트_${Date.now()}.jpg`; a.click();
+}
+
+/** 고른 템플릿으로 한 장을 그린다 */
+function spRender(data, tplId) {
+  const tpl = SP_TEMPLATES[tplId] || SP_TEMPLATES.rank;
+  const T = SP_THEMES[tplId] || SP_THEMES.rank;
+  const cv = document.createElement('canvas');
+  cv.width = 1080; cv.height = 1080;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = T.bg; ctx.fillRect(0, 0, 1080, 1080);
+  tpl.render(ctx, data || {}, T);
+  return cv.toDataURL('image/jpeg', 0.93);
 }
 
 // 모든 선언이 끝난 뒤에 결과 창을 처음 그린다.
