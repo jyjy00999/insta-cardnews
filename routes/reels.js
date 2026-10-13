@@ -31,9 +31,13 @@ router.post('/generate-script', async (req, res) => {
   let videoHint = '';
   if (videoRef) {
     const sa = videoRef.styleAnalysis;
+    // 인스타 참고 글은 캡션을 통째로 들고 온다. 말투를 그대로 배우게 넘긴다.
+    const capHint = videoRef.caption
+      ? `\n━━━ 참고 게시물의 실제 캡션 ━━━\n${String(videoRef.caption).slice(0, 600)}\n→ 이 글의 말투·호흡·후킹 방식을 그대로 따라 써라. 내용은 베끼지 말고 방식만 가져와라.`
+      : '';
     if (sa) {
       videoHint = `
-📹 벤치마킹 참고 영상: "${videoRef.title}" (${videoRef.author})
+📹 벤치마킹 참고 영상: "${videoRef.title}" (${videoRef.author} · ${videoRef.platform || ''})${capHint}
 ━━━ 이 영상 스타일을 그대로 복제해서 비슷한 퀄리티로 만들어 ━━━
 • 컨셉: ${sa.concept || '-'}
 • 분위기: ${sa.mood || '-'}
@@ -48,7 +52,7 @@ router.post('/generate-script', async (req, res) => {
 → mainText·subText·narration 톤도 위 편집 느낌과 후킹 전략에 맞게 써.`;
     } else {
       videoHint = `
-📹 벤치마킹 참고 영상: "${videoRef.title}" (${videoRef.author})
+📹 벤치마킹 참고 영상: "${videoRef.title}" (${videoRef.author} · ${videoRef.platform || ''})${capHint}
 → 이 영상의 컨셉/편집 스타일/분위기/후킹 방식을 분석해서 그대로 적용해.
 → 컨셉 자동 감지: 음식이면 클로즈업·따뜻한 조명, 여행이면 와이드샷·골든아워, 라이프스타일이면 밝은 인테리어·자연광.`;
     }
@@ -169,28 +173,78 @@ const STYLE_SCHEMA = `{
   "contentStrategy": "이 영상이 쓰는 후킹 전략 (예: 숫자 나열, 비포애프터, 공감 질문, 놀라운 사실 공개 등)"
 }`;
 
+/** &amp; &#x1f440; 같은 엔티티를 되돌린다. 인스타 og 태그가 전부 이렇게 인코딩돼 있다. */
+function decodeEntities(s) {
+  return String(s || '')
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+/**
+ * 인스타그램 게시물 정보.
+ * 공개 oEmbed 는 임베드 HTML 만 주고 제목·썸네일은 토큰을 요구한다.
+ * 다만 링크 미리보기용 og 태그는 크롤러 UA 로 받으면 그대로 내려온다.
+ */
+async function fetchInstagramInfo(url) {
+  const r = await fetch(url, {
+    headers: { 'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)' },
+    signal: AbortSignal.timeout(30000)
+  });
+  if (!r.ok) throw new Error(`인스타그램 게시물을 불러오지 못했습니다 (${r.status}). 공개 게시물인지 확인해주세요.`);
+  const html = await r.text();
+
+  const pick = p => decodeEntities(
+    (html.match(new RegExp(`<meta\\s+property="og:${p}"\\s+content="([^"]*)"`)) || [])[1] || ''
+  );
+  const ogTitle = pick('title'), ogDesc = pick('description'), thumbnail = pick('image');
+  if (!ogTitle && !ogDesc) {
+    throw new Error('인스타그램에서 정보를 읽지 못했습니다. 비공개 게시물이거나 삭제됐을 수 있습니다.');
+  }
+
+  // og:description 형태: `476 likes, 6 comments - health_tip_mag on October 2, 2026: "본문..."`
+  const m = ogDesc.match(/^.*?-\s*([^\s]+)\s+on\s+[^:]+:\s*"?([\s\S]*?)"?$/);
+  const author  = m ? m[1] : (ogTitle.split(' on Instagram')[0] || '');
+  const caption = (m ? m[2] : ogDesc).trim();
+
+  return {
+    title: caption.split('\n')[0].slice(0, 60) || ogTitle.slice(0, 60),
+    author, caption, thumbnail, platform: 'Instagram'
+  };
+}
+
 router.post('/video-info', async (req, res) => {
   const { url, apiKey } = req.body;
   if (!url) return res.status(400).json({ error: 'URL 필요' });
 
+  const isInstagram = /instagram\.com\/(reel|p|tv)\//i.test(url);
+
   try {
-    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
-    const r = await fetch(oembedUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    if (!r.ok) throw new Error('YouTube 영상을 찾을 수 없습니다. URL을 확인해주세요.');
-    const d = await r.json();
+    let info, thumbUrl;
 
-    // 고해상도 썸네일 시도 (maxresdefault → oEmbed 기본값 폴백)
-    let thumbUrl = d.thumbnail_url || '';
-    const vidIdMatch = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
-    if (vidIdMatch) {
-      const hq = `https://img.youtube.com/vi/${vidIdMatch[1]}/maxresdefault.jpg`;
-      try {
-        const tr = await fetch(hq, { method: 'HEAD' });
-        if (tr.ok) thumbUrl = hq;
-      } catch {}
+    if (isInstagram) {
+      info = await fetchInstagramInfo(url);
+      thumbUrl = info.thumbnail;
+    } else {
+      const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+      const r = await fetch(oembedUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      if (!r.ok) throw new Error('영상을 찾을 수 없습니다. 유튜브 또는 인스타그램 주소인지 확인해주세요.');
+      const d = await r.json();
+
+      // 고해상도 썸네일 시도 (maxresdefault → oEmbed 기본값 폴백)
+      thumbUrl = d.thumbnail_url || '';
+      const vidIdMatch = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+      if (vidIdMatch) {
+        const hq = `https://img.youtube.com/vi/${vidIdMatch[1]}/maxresdefault.jpg`;
+        try {
+          const tr = await fetch(hq, { method: 'HEAD' });
+          if (tr.ok) thumbUrl = hq;
+        } catch {}
+      }
+      info = { title: d.title, author: d.author_name, thumbnail: thumbUrl, platform: 'YouTube' };
     }
-
-    const info = { title: d.title, author: d.author_name, thumbnail: thumbUrl, platform: 'YouTube' };
 
     // Gemini·Claude 키면 썸네일을 직접 보고, 아니면 제목·채널명으로 추정한다.
     try {
@@ -200,25 +254,32 @@ router.post('/video-info', async (req, res) => {
         if (imgR.ok) {
           const imgB64 = Buffer.from(await imgR.arrayBuffer()).toString('base64');
           const ct = imgR.headers.get('content-type') || 'image/jpeg';
+          // 인스타는 캡션을 통째로 받아올 수 있다. 썸네일과 같이 주면
+          // 말투와 후킹 방식까지 훨씬 정확하게 읽어낸다.
+          const capPart = info.caption
+            ? `\n\n이 게시물의 실제 캡션:\n"""${info.caption.slice(0, 700)}"""\n→ 캡션의 말투와 후킹 방식도 같이 읽어서 contentStrategy 에 반영해줘.`
+            : '';
           raw = await callVision(apiKey, imgB64, ct,
-`이 영상 썸네일을 분석해서 인스타그램 릴스 영상 제작에 활용할 스타일 가이드를 JSON으로 작성해주세요.
+`이 ${info.platform} 게시물의 대표 이미지를 분석해서 인스타그램 릴스 영상 제작에 활용할 스타일 가이드를 JSON으로 작성해주세요.${capPart}
 
 JSON만 응답:
-${STYLE_SCHEMA}`, 600);
+${STYLE_SCHEMA}`, 700);
         }
       }
 
       if (raw === null) {
+        // 이미지를 못 보는 키. 글로 된 정보만으로 추정한다.
+        // 인스타는 캡션이 있어 유튜브(제목뿐)보다 훨씬 나은 추정이 된다.
         raw = await callAI(apiKey,
-`아래 유튜브 영상의 제목과 채널명만 보고, 이 영상이 어떤 스타일일지 추정해서
+`아래 ${info.platform} 게시물 정보를 보고 어떤 스타일일지 추정해서
 인스타그램 릴스 제작용 스타일 가이드를 JSON으로 작성해주세요.
 
 제목: ${info.title}
-채널: ${info.author}
+계정: ${info.author}${info.caption ? `\n캡션:\n"""${info.caption.slice(0, 700)}"""` : ''}
 
 JSON만 응답:
-${STYLE_SCHEMA}`, 1200);
-        info.styleGuessed = true; // 썸네일을 직접 못 봤다는 표시
+${STYLE_SCHEMA}`, 1500);
+        info.styleGuessed = true; // 대표 이미지를 직접 못 봤다는 표시
       }
 
       info.styleAnalysis = parseJson(raw, '스타일 분석');
