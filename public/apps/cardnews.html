@@ -56,6 +56,16 @@ textarea{min-height:70px}
 .btn-suggest:disabled{opacity:.5;cursor:not-allowed}
 
 
+/* 카드 디자인 고르기 — 글자만 늘어놓으면 뭐가 다른지 모르니 작은 미리보기를 그려 넣는다 */
+.tpl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tpl-btn{padding:0;border-radius:var(--r-sm);border:2px solid var(--border);background:var(--surf2);cursor:pointer;transition:.15s;overflow:hidden;display:block}
+.tpl-btn:hover{border-color:var(--p2)}
+.tpl-btn.active{border-color:var(--p1);box-shadow:0 0 0 3px rgba(109,40,217,.16)}
+.tpl-btn canvas{display:block;width:100%;aspect-ratio:1;background:#fff}
+.tpl-btn span{display:block;padding:4px 2px;font-size:.66rem;font-weight:600;color:var(--tx2);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tpl-btn.active span{color:var(--p1)}
+.tpl-hint{margin-top:7px;font-size:.68rem;color:var(--tx2);line-height:1.5}
+
 .style-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
 .style-btn{padding:7px 4px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surf2);color:var(--tx2);font-size:.75rem;font-weight:600;cursor:pointer;transition:.15s;text-align:center}
 .style-btn:hover{border-color:var(--p2);color:var(--p2)}
@@ -311,7 +321,15 @@ input[type=range]{flex:1;height:4px;accent-color:var(--p1);cursor:pointer}
     </div>
 
     <div class="sb-section">
-      <div class="sb-label">🎨 아트 스타일</div>
+      <div class="sb-label">🖼️ 카드 디자인</div>
+      <div class="tpl-grid" id="tpl-grid"></div>
+      <div class="tpl-hint">디자인을 바꾸면 이미 만든 카드도 바로 다시 그려집니다</div>
+    </div>
+
+    <!-- 아트 스타일은 사진형 템플릿에서 배경 그림을 어떤 화풍으로 뽑을지 정한다.
+         글만 쓰는 템플릿에서는 쓸 데가 없어 숨긴다. -->
+    <div class="sb-section" id="art-style-section">
+      <div class="sb-label">🎨 배경 그림 화풍</div>
       <div class="style-grid">
         <button class="style-btn active" data-style="webtoon" onclick="setStyle(this)">🎭 웹툰</button>
         <button class="style-btn" data-style="minimal" onclick="setStyle(this)">📐 미니멀</button>
@@ -428,6 +446,46 @@ document.getElementById('modal-settings').addEventListener('click',e=>{ if(e.tar
 
 // ── 스타일 ───────────────────────────────────────────────────
 function setStyle(btn){ document.querySelectorAll('.style-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); artStyle=btn.dataset.style }
+
+// ── 카드 디자인 고르기 ────────────────────────────────────────
+// 이름만 보면 뭐가 다른지 모르니, 실제 템플릿 그리는 코드로 작은 견본을 만든다.
+function buildTemplatePicker(){
+  const grid=document.getElementById('tpl-grid');
+  if(!grid) return;
+  grid.innerHTML = Object.entries(CARD_TEMPLATES).map(([id,t])=>
+    `<button class="tpl-btn${id===cardTemplate?' active':''}" data-tpl="${id}" onclick="setTemplate('${id}')" title="${esc(t.name)}">
+       <canvas id="tplc-${id}" width="150" height="150"></canvas>
+       <span>${esc(t.name)}</span>
+     </button>`).join('');
+
+  for(const [id,t] of Object.entries(CARD_TEMPLATES)){
+    const c=document.getElementById(`tplc-${id}`); if(!c) continue;
+    const x=c.getContext('2d');
+    x.save(); x.scale(150/1080,150/1080);       // 실물과 같은 좌표로 그린 뒤 줄인다
+    x.fillStyle=t.bg; x.fillRect(0,0,1080,1080);
+    if(t.deco) t.deco(x);
+    // 글이 들어갈 자리를 막대로 흉내낸다
+    if(t.photo==='left'){
+      rrect(x,40,260,440,420,18,t.boxBg[1],t.boxBd[1],6);
+      [0,1,2].forEach(i=>rrect(x,520,300+i*140,500,110,14,t.boxBg[i%t.boxBg.length],t.boxBd[i%t.boxBd.length],6));
+    } else {
+      [0,1,2].forEach(i=>rrect(x,140,470+i*130,800,106,14,t.boxBg[i%t.boxBg.length],t.boxBd[i%t.boxBd.length],6));
+      rrect(x,140,880,800,100,16,t.tipBg,t.tipBd,6);
+    }
+    rrect(x,300,290,480,54,10,t.ink,null);      // 제목
+    rrect(x,400,370,280,26,8,t.underline,null); // 밑줄
+    x.restore();
+  }
+  syncArtStyleVisibility();
+}
+
+/** 사진형이 아니면 배경 그림 화풍 고르는 칸을 숨긴다 */
+function syncArtStyleVisibility(){
+  const sec=document.getElementById('art-style-section');
+  if(!sec) return;
+  const t=CARD_TEMPLATES[cardTemplate];
+  sec.style.display = (t && t.photo==='left') ? '' : 'none';
+}
 
 // ── 주제 추천 (인라인) ────────────────────────────────────────
 async function suggestTopics(){
@@ -622,16 +680,142 @@ function wrapText(ctx,text,x,y,maxW,lh,maxLines=99){
   return lineY+lh;
 }
 
+// ══ 카드 템플릿 ═══════════════════════════════════════════════
+// 디자인마다 바탕·테두리·장식·색을 다르게 두고, 글 배치는 공용 엔진이 맡는다.
+// photo:'left'  — 생성한 그림을 왼쪽에 두고 글을 오른쪽에 (기존 방식)
+// photo:'none'  — 그림 없이 글만. 칸바 카드뉴스 템플릿이 대개 이 꼴이다.
+const CARD_TEMPLATES = {
+  photo: {
+    name: '📷 사진형', photo: 'left',
+    bg:'#FDFAF4', ink:'#2C1A0E', accent:'#D94500', sub:'#7B4E28',
+    boxBg:['#FFF9E6','#EAF5FB','#FBF0EA','#EAF8EE','#F3ECF9'],
+    boxBd:['#F0BF50','#74B9E8','#EE8855','#5CB87A','#AB82D4'],
+    tipBg:'#FFF8E0', tipBd:'#FFD060', underline:'#FFD166', badge:'#6D28D9',
+    deco(ctx){ rrect(ctx,8,8,1064,1064,20,null,'#EDD8A0',10) }
+  },
+
+  note: {
+    name: '📓 노트', photo: 'none',
+    bg:'#EEF3F8', card:'#FFFFFF', ink:'#1F2937', accent:'#2563EB', sub:'#6B7280',
+    boxBg:['#F8FAFC','#F8FAFC','#F8FAFC','#F8FAFC','#F8FAFC'],
+    boxBd:['#CBD5E1','#CBD5E1','#CBD5E1','#CBD5E1','#CBD5E1'],
+    tipBg:'#EFF6FF', tipBd:'#93C5FD', underline:'#BFDBFE', badge:'#2563EB',
+    deco(ctx){
+      // 모눈 바탕
+      ctx.strokeStyle='rgba(100,130,170,.16)'; ctx.lineWidth=1;
+      for(let i=0;i<=1080;i+=36){
+        ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,1080); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(1080,i); ctx.stroke();
+      }
+      rrect(ctx,52,96,976,932,18,'#FFFFFF','#111827',4);
+      // 상단 집게
+      rrect(ctx,470,52,140,74,10,'#4B5563',null);
+      rrect(ctx,492,34,96,44,8,'#9CA3AF',null);
+    }
+  },
+
+  folder: {
+    name: '🗂️ 폴더', photo: 'none',
+    bg:'#5B5BD6', card:'#FFFFFF', ink:'#1E1B4B', accent:'#5B5BD6', sub:'#6366F1',
+    boxBg:['#EEF2FF','#EEF2FF','#EEF2FF','#EEF2FF','#EEF2FF'],
+    boxBd:['#A5B4FC','#A5B4FC','#A5B4FC','#A5B4FC','#A5B4FC'],
+    tipBg:'#EEF2FF', tipBd:'#818CF8', underline:'#C7D2FE', badge:'#4F46E5',
+    deco(ctx){
+      // 폴더 탭
+      rrect(ctx,56,44,300,70,14,'#4F46E5',null);
+      ['#F59E0B','#38BDF8','#FBBF24'].forEach((c,i)=>
+        rrect(ctx,700+i*110,44,96,70,12,c,null));
+      rrect(ctx,56,96,968,936,22,'#FFFFFF',null);
+    }
+  },
+
+  memo: {
+    name: '📎 메모지', photo: 'none',
+    bg:'#FBF3E4', card:'#FFFEF9', ink:'#3B2F1E', accent:'#C2410C', sub:'#8A7355',
+    boxBg:['#FFFBF0','#FFFBF0','#FFFBF0','#FFFBF0','#FFFBF0'],
+    boxBd:['#E8D5A8','#E8D5A8','#E8D5A8','#E8D5A8','#E8D5A8'],
+    tipBg:'#FEF6E0', tipBd:'#E0BE72', underline:'#F5D78E', badge:'#C2410C',
+    deco(ctx){
+      rrect(ctx,56,92,968,940,16,'#FFFEF9','#3B2F1E',3);
+      // 클립
+      ctx.strokeStyle='#4B5563'; ctx.lineWidth=9; ctx.lineCap='round';
+      ctx.beginPath();
+      ctx.moveTo(528,150); ctx.lineTo(528,64);
+      ctx.arc(552,64,24,Math.PI,0); ctx.lineTo(576,140);
+      ctx.arc(552,140,24,0,Math.PI);
+      ctx.lineTo(540,78); ctx.stroke();
+      ctx.lineCap='butt';
+    }
+  },
+
+  bold: {
+    name: '🔳 모던', photo: 'none',
+    bg:'#1D4ED8', card:'#FFFFFF', ink:'#0F172A', accent:'#1D4ED8', sub:'#475569',
+    boxBg:['#F1F5F9','#F1F5F9','#F1F5F9','#F1F5F9','#F1F5F9'],
+    boxBd:['#1D4ED8','#1D4ED8','#1D4ED8','#1D4ED8','#1D4ED8'],
+    tipBg:'#EFF6FF', tipBd:'#1D4ED8', underline:'#93C5FD', badge:'#1D4ED8',
+    deco(ctx){
+      rrect(ctx,60,60,960,960,6,'#FFFFFF',null);
+      rrect(ctx,92,92,896,896,4,null,'#1D4ED8',5);
+    }
+  },
+
+  pastel: {
+    name: '🌸 파스텔', photo: 'none',
+    bg:'#CFEAFB', card:'#FFFFFF', ink:'#2B3A55', accent:'#EC4899', sub:'#7C8BA1',
+    boxBg:['#FFF1F6','#F0F9FF','#FFF7ED','#F0FDF4','#F5F3FF'],
+    boxBd:['#F9A8D4','#93C5FD','#FCD34D','#86EFAC','#C4B5FD'],
+    tipBg:'#FFF1F6', tipBd:'#F9A8D4', underline:'#FBCFE8', badge:'#EC4899',
+    deco(ctx){
+      // 물결 테두리 카드
+      ctx.save(); ctx.beginPath();
+      const r=34, x0=58, y0=58, x1=1022, y1=1022, step=48;
+      ctx.moveTo(x0+r,y0);
+      for(let x=x0+r;x<x1-r;x+=step) ctx.arcTo(x+step/2,y0-16,x+step,y0,r);
+      ctx.lineTo(x1-r,y0); ctx.arcTo(x1,y0,x1,y0+r,r);
+      ctx.lineTo(x1,y1-r); ctx.arcTo(x1,y1,x1-r,y1,r);
+      ctx.lineTo(x0+r,y1); ctx.arcTo(x0,y1,x0,y1-r,r);
+      ctx.lineTo(x0,y0+r); ctx.arcTo(x0,y0,x0+r,y0,r);
+      ctx.closePath(); ctx.fillStyle='#FFFFFF'; ctx.fill(); ctx.restore();
+    }
+  }
+};
+
+let cardTemplate = localStorage.getItem('cn_template') || 'photo';
+
+function setTemplate(id){
+  cardTemplate = id;
+  try{ localStorage.setItem('cn_template', id) }catch(e){}
+  document.querySelectorAll('.tpl-btn').forEach(b=>b.classList.toggle('active', b.dataset.tpl===id));
+  syncArtStyleVisibility();
+  redrawAllCards();
+}
+
+/** 템플릿만 바꿔 다시 그린다. 이미지는 그대로 쓰므로 API 를 다시 부르지 않는다. */
+async function redrawAllCards(){
+  const targets = slides.map((s,i)=>s.rawImgUrl||s.imgUrl?i:-1).filter(i=>i>=0);
+  if(!targets.length) return;
+  for(const i of targets){
+    slides[i].imgUrl = await renderInfoCard(slides[i], slides[i].rawImgUrl||'');
+    updateCard(i);
+  }
+}
+
 async function renderInfoCard(slide, illSrc){
   await ensureFonts();
+  const T = CARD_TEMPLATES[cardTemplate] || CARD_TEMPLATES.photo;
   const cv=document.createElement('canvas'); cv.width=1080; cv.height=1080;
   const ctx=cv.getContext('2d');
 
-  // ── 배경 ──
-  ctx.fillStyle=CARD_BG; ctx.fillRect(0,0,1080,1080);
+  // ── 바탕 + 템플릿 장식 ──
+  ctx.fillStyle=T.bg; ctx.fillRect(0,0,1080,1080);
+  if(T.deco) T.deco(ctx);
 
-  // ── 외곽 테두리 ──
-  rrect(ctx,8,8,1064,1064,20,null,'#EDD8A0',10);
+  if(T.photo === 'none') return renderTextCard(ctx, cv, slide, T);
+
+  // ── 아래는 사진형(기존 레이아웃) ──
+  const CARD_BG=T.bg, TITLE_DARK=T.ink, TITLE_ACC=T.accent;
+  const BOX_BG=T.boxBg, BOX_BD=T.boxBd, TIP_BG=T.tipBg, TIP_BD=T.tipBd, DECO_COL=T.underline;
 
   // ── 슬라이드 번호 뱃지 ──
   ctx.beginPath(); ctx.arc(68,68,38,0,Math.PI*2);
@@ -727,6 +911,128 @@ async function renderInfoCard(slide, illSrc){
   return cv.toDataURL('image/jpeg',.93);
 }
 
+/**
+ * 글 중심 카드. 칸바 카드뉴스 템플릿이 대개 이 꼴이다 —
+ * 흰 카드 위에 큰 제목, 그 아래 항목들, 맨 밑에 한 줄 정리.
+ * 바탕과 장식은 템플릿이 이미 그려놨고 여기서는 글만 올린다.
+ */
+function renderTextCard(ctx, cv, slide, T){
+  const title=slide.title||'', accent=slide.titleAccent||'', sub=slide.subtitle||'';
+  const pts=(slide.points||[]).filter(Boolean);
+  const CX=540;                 // 카드 가로 중앙
+  const L=120, R=960, W=R-L;    // 글이 들어갈 좌우 경계
+
+  // ── 라벨 (CARDNEWS) ──
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.font='700 22px "Noto Sans KR"'; ctx.fillStyle=T.sub;
+  ctx.fillText('CARDNEWS', CX, 196);
+
+  // ── 제목 — 길면 줄바꿈하고 글자를 줄인다 ──
+  let fs = title.length<=8 ? 96 : title.length<=14 ? 78 : 64;
+  ctx.font=`900 ${fs}px "Noto Sans KR"`;
+  const tLines = fitLines(ctx, title, W);
+  if(tLines.length>2){ fs=Math.round(fs*0.8); ctx.font=`900 ${fs}px "Noto Sans KR"`; }
+  const lines = fitLines(ctx, title, W).slice(0,3);
+
+  let ty = 300;
+  const lh = Math.round(fs*1.22);
+  lines.forEach(line=>{
+    const ai = accent ? line.indexOf(accent) : -1;
+    if(ai>=0){
+      // 강조어만 색을 달리한다
+      const before=line.slice(0,ai), mid=accent, after=line.slice(ai+accent.length);
+      const tw=ctx.measureText(line).width;
+      let x=CX-tw/2; ctx.textAlign='left';
+      if(before){ ctx.fillStyle=T.ink; ctx.fillText(before,x,ty); x+=ctx.measureText(before).width }
+      ctx.fillStyle=T.accent; ctx.fillText(mid,x,ty); x+=ctx.measureText(mid).width;
+      if(after){ ctx.fillStyle=T.ink; ctx.fillText(after,x,ty) }
+      ctx.textAlign='center';
+    } else {
+      ctx.fillStyle=T.ink; ctx.fillText(line,CX,ty);
+    }
+    ty += lh;
+  });
+
+  // 제목 밑줄
+  const lastW = Math.min(ctx.measureText(lines[lines.length-1]||'').width, W);
+  rrect(ctx, CX-lastW/2, ty-lh/2+14, lastW, 12, 6, T.underline, null);
+
+  // ── 부제목 ──
+  let y = ty - lh/2 + 68;
+  if(sub){
+    ctx.font='600 36px "Noto Sans KR"'; ctx.fillStyle=T.sub; ctx.textAlign='center';
+    ctx.fillText(sub, CX, y); y += 56;
+  }
+
+  // ── 항목 목록 ──
+  const tipText = slide.tip||'';
+  const tipH = tipText ? 150 : 0;
+  const listBot = 940 - tipH;
+  const avail = listBot - y - 20;
+  const n = pts.length;
+  if(n){
+    const gap = 14;
+    const boxH = Math.max(72, Math.min(116, Math.floor((avail-(n-1)*gap)/n)));
+    pts.forEach((pt,i)=>{
+      const bg=T.boxBg[i%T.boxBg.length], bd=T.boxBd[i%T.boxBd.length];
+      rrect(ctx, L, y, W, boxH, 14, bg, bd, 3);
+      // 번호 원
+      ctx.beginPath(); ctx.arc(L+40, y+boxH/2, 21, 0, Math.PI*2);
+      ctx.fillStyle=bd; ctx.fill();
+      ctx.font='800 22px "Noto Sans KR"'; ctx.fillStyle='#fff';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(String(i+1), L+40, y+boxH/2);
+      // 내용
+      ctx.font='600 29px "Noto Sans KR"'; ctx.fillStyle=T.ink;
+      ctx.textAlign='left';
+      const maxLines = boxH>96?2:1;
+      wrapText(ctx, pt, L+78, y+boxH/2-(maxLines>1?17:0), W-96, 34, maxLines);
+      y += boxH + gap;
+    });
+  }
+
+  // ── 한 줄 정리 ──
+  if(tipText){
+    const th=128, tyy=940-th;
+    rrect(ctx, L, tyy, W, th, 16, T.tipBg, T.tipBd, 3);
+    ctx.font='34px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText('✅', L+26, tyy+th/2);
+    ctx.font='700 29px "Noto Sans KR"'; ctx.fillStyle=T.ink; ctx.textBaseline='top';
+    wrapText(ctx, tipText, L+76, tyy+30, W-104, 38, 2);
+  }
+
+  // ── 슬라이드 번호 ──
+  ctx.beginPath(); ctx.arc(1004, 1004, 30, 0, Math.PI*2);
+  ctx.fillStyle=T.badge; ctx.fill();
+  ctx.font='900 26px "Noto Sans KR"'; ctx.fillStyle='#fff';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(String(slide.slide||1), 1004, 1004);
+
+  return cv.toDataURL('image/jpeg',.93);
+}
+
+/** 가로 폭에 맞춰 줄을 나눈다. 한글은 글자 단위로도 끊는다. */
+function fitLines(ctx, text, maxW){
+  const words=String(text||'').split(' ');
+  const out=[]; let cur='';
+  for(const w of words){
+    const t=cur?cur+' '+w:w;
+    if(ctx.measureText(t).width<=maxW){ cur=t; continue }
+    if(cur){ out.push(cur); cur=w }
+    else {
+      // 한 낱말이 통째로 넘칠 때는 글자로 끊는다
+      let piece='';
+      for(const ch of w){
+        if(ctx.measureText(piece+ch).width>maxW){ out.push(piece); piece=ch }
+        else piece+=ch;
+      }
+      cur=piece;
+    }
+  }
+  if(cur) out.push(cur);
+  return out.length?out:[''];
+}
+
 // ── 그리드 렌더 ───────────────────────────────────────────────
 function renderGrid(){ document.getElementById('slides-grid').innerHTML=slides.map((_,i)=>cardHTML(i)).join('') }
 function cardHTML(i){
@@ -770,6 +1076,15 @@ function updateTitle(i,val){
 // 뽑으면 뒤쪽이 통째로 비는 일이 잦아서, 한 번 실패했다고 넘어가지 않는다.
 async function buildSlideImage(i, { retries = 3, seedShift = 0 } = {}){
   const s = slides[i]; if(!s) return false;
+
+  // 글만 쓰는 템플릿은 배경 그림이 필요 없다. 외부 API 를 부르지 않으니
+  // 바로 그려지고, 이미지 생성이 실패해 빈 카드가 남는 일도 없다.
+  if((CARD_TEMPLATES[cardTemplate]||{}).photo !== 'left'){
+    s.rawImgUrl = '';
+    s.imgUrl = await renderInfoCard(s, '');
+    return true;
+  }
+
   const desc = (selectedChar>=0&&characters[selectedChar]?.description)
     ? characters[selectedChar].description : (needsChar?charDesc:'');
   const noHumans = !needsChar && selectedChar===-1;
@@ -878,6 +1193,7 @@ async function downloadAll(){
 // ── 초기화 ───────────────────────────────────────────────────
 // 서비스워커 등록은 최상위 셸(index.html)이 맡는다.
 // 이 화면은 iframe 안에서 돌기 때문에 여기서 등록하면 실패한다.
+buildTemplatePicker();
 </script>
 </body>
 </html>
