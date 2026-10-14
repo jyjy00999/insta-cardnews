@@ -13,6 +13,11 @@ router.post('/generate-script', async (req, res) => {
   const sceneCount = dur <= 15 ? 4 : dur <= 20 ? 5 : dur <= 25 ? 5 : 6;
   const secPerScene = parseFloat((dur / sceneCount).toFixed(1));
 
+  // 나레이션이 장면보다 길면 다음 장면 음성과 겹쳐 두 사람이 말하는 것처럼 들린다.
+  // 실측: 45자 7.68초, 17자 3.17초 → 초당 약 5.3자. 띄어쓰기와 문장 끝 쉼까지
+  // 감안해 5.0 으로 잡고, 말 앞뒤 여유 0.8초를 뺀 만큼만 쓰게 한다.
+  const narrLimit = Math.max(10, Math.floor((secPerScene - 0.8) * 5.0));
+
   const styleGuide = {
     trendy: '트렌디하고 세련된 MZ 감성, 임팩트 있는 짧은 문구, 강렬한 시각 구성',
     minimal: '깔끔하고 미니멀, 여백 활용, 핵심만 간결하게',
@@ -73,7 +78,10 @@ ${charHint}${videoHint}
 - mainText: 8자 이내 (캔버스 크게 표시) — ⚠️ "저장", "팔로우", "공유", "구독" 단어 절대 금지
 - subText: 18자 이내 (mainText 아래 설명)
 - keyword: 3자 이내 강조 단어 (숫자나 핵심 키워드만)
-- narration: 해당 장면에서 실제로 말할 나레이션 대사 (60자 이내, 자연스러운 구어체, 시청자에게 직접 말하는 말투)
+- narration: 해당 장면에서 실제로 말할 나레이션 대사 (⚠️ ${narrLimit}자 이내, 자연스러운 구어체, 시청자에게 직접 말하는 말투)
+  ⚠️ 글자 수를 반드시 지켜라. 한국어 음성은 1초에 약 5.5자를 읽는다.
+     장면이 ${secPerScene}초뿐이라 ${narrLimit}자를 넘으면 다음 장면 음성과 겹쳐서 영상을 못 쓴다.
+     길게 쓰지 말고, 한 장면에 한 가지만 짧게 말해라.
 
 imagePrompt 규칙:
 - 반드시 영어로 작성

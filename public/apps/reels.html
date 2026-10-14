@@ -826,8 +826,7 @@ async function renderVideo(script, ttsBuffers={}){
 
   const fps=30;
   const scenes=script.scenes||[];
-  const totalDur=scenes.reduce((s,sc)=>s+(sc.duration||3),0);
-  const totalFrames=Math.round(totalDur*fps);
+  // 실제 길이는 나레이션에 맞춰 장면을 늘린 뒤에 realDur 로 다시 잰다.
 
   // AudioContext 설정
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -853,6 +852,25 @@ async function renderVideo(script, ttsBuffers={}){
     } catch(e){ console.warn('오디오 디코딩 실패 id='+id, e.message) }
   }
 
+  // ── 나레이션 길이에 맞춰 장면 길이를 늘린다 ──
+  // 나레이션은 60자까지 쓰는데 장면은 15초÷4=3.75초다. 말이 안 끝난 채로
+  // 다음 장면 음성이 시작돼 목소리가 겹쳐 들렸다. 장면이 말을 다 담도록 늘린다.
+  // 서버가 장면 길이에 맞춰 나레이션 글자 수를 제한하지만, 모델이 어기면
+  // 여기서 막는다. 다만 무한정 늘리면 15초짜리가 30초가 되므로 1.8배까지만 늘린다.
+  // 그래도 넘치는 말은 장면 끝에서 잘린다 — 겹쳐서 뭉개지는 것보다는 낫다.
+  const LEAD = 0.25, TAIL = 0.45, MAX_STRETCH = 1.8;
+  let stretched = 0;
+  for(const sc of scenes){
+    const a = decodedAudio[sc.id];
+    if(!a) continue;
+    const base = sc.duration || 3;
+    const need = Math.min(LEAD + a.duration + TAIL, base * MAX_STRETCH);
+    if(need > base){ sc.duration = Math.round(need * 100) / 100; stretched++; }
+  }
+  if(stretched) console.log(`[렌더] 나레이션에 맞춰 장면 ${stretched}개 길이 조정`);
+
+  const realDur = scenes.reduce((s,sc)=>s+(sc.duration||3),0);
+
   return new Promise(resolve=>{
     recorder.onstop=()=>{ audioCtx.close(); resolve(new Blob(chunks,{type:mime})) };
 
@@ -866,31 +884,30 @@ async function renderVideo(script, ttsBuffers={}){
       if(decodedAudio[sc.id]){
         const src = audioCtx.createBufferSource();
         src.buffer = decodedAudio[sc.id];
-        // 볼륨
         const gain = audioCtx.createGain();
         gain.gain.value = 1.1;
         src.connect(gain); gain.connect(dest);
-        // 장면 시작 0.25초 후 나레이션 시작
-        src.start(recStart + sceneOffset + 0.25);
+        src.start(recStart + sceneOffset + LEAD);
       }
       sceneOffset += sc.duration || 3;
     }
 
-    // Canvas 프레임 렌더링
-    let frame=0;
+    // ── 프레임 그리기 ──
+    // 예전엔 setInterval 이 1000/30ms 마다 정확히 돈다고 보고 frame 수로
+    // 시각을 셌다. 실제로는 그보다 느리게 돌아서 영상이 늘어지고 소리와
+    // 어긋났다. 오디오 시계를 기준으로 "지금 몇 초 지점인지"를 계산해 그린다.
     const iv=setInterval(()=>{
-      if(stopFlag||frame>=totalFrames){
+      const t = audioCtx.currentTime - recStart;     // 녹화 시작 후 경과(초)
+      if(stopFlag || t >= realDur){
         clearInterval(iv);
-        setProg(97, '영상 마무리 중... 100%');   // 녹화를 닫는 동안
-        recorder.stop();
+        setProg(97, '영상 마무리 중... 100%');
+        setTimeout(()=>recorder.stop(), 120);        // 마지막 소리 꼬리를 담는다
         return;
       }
-      drawFrame((frame/fps)*1000); frame++;
-      // 막대는 전체 공정의 62~97 구간을 쓰지만, 숫자는 이 단계의 진행률을 보여준다.
-      // 예전엔 둘 다 62+35 로 계산해 다 끝나도 97%로 보였다.
-      const pct = Math.min(100, Math.round((frame/totalFrames)*100));
-      setProg(62+(frame/totalFrames)*35, `영상 렌더링 ${pct}%`);
-    },1000/fps);
+      drawFrame(Math.max(0, t) * 1000);
+      const pct = Math.min(100, Math.round((t/realDur)*100));
+      setProg(62+(t/realDur)*35, `영상 렌더링 ${pct}%`);
+    }, 1000/fps);
   });
 }
 
