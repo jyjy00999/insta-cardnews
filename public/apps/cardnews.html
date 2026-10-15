@@ -694,26 +694,6 @@ const CARD_TEMPLATES = {
     deco(ctx){ rrect(ctx,8,8,1064,1064,20,null,'#EDD8A0',10) }
   },
 
-  note: {
-    name: '📓 노트', photo: 'none',
-    bg:'#EEF3F8', card:'#FFFFFF', ink:'#1F2937', accent:'#2563EB', sub:'#6B7280',
-    boxBg:['#F8FAFC','#F8FAFC','#F8FAFC','#F8FAFC','#F8FAFC'],
-    boxBd:['#CBD5E1','#CBD5E1','#CBD5E1','#CBD5E1','#CBD5E1'],
-    tipBg:'#EFF6FF', tipBd:'#93C5FD', underline:'#BFDBFE', badge:'#2563EB',
-    deco(ctx){
-      // 모눈 바탕
-      ctx.strokeStyle='rgba(100,130,170,.16)'; ctx.lineWidth=1;
-      for(let i=0;i<=1080;i+=36){
-        ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,1080); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(1080,i); ctx.stroke();
-      }
-      rrect(ctx,52,96,976,932,18,'#FFFFFF','#111827',4);
-      // 상단 집게
-      rrect(ctx,470,52,140,74,10,'#4B5563',null);
-      rrect(ctx,492,34,96,44,8,'#9CA3AF',null);
-    }
-  },
-
   folder: {
     name: '🗂️ 폴더', photo: 'none',
     bg:'#5B5BD6', card:'#FFFFFF', ink:'#1E1B4B', accent:'#5B5BD6', sub:'#6366F1',
@@ -727,61 +707,12 @@ const CARD_TEMPLATES = {
         rrect(ctx,700+i*110,44,96,70,12,c,null));
       rrect(ctx,56,96,968,936,22,'#FFFFFF',null);
     }
-  },
-
-  memo: {
-    name: '📎 메모지', photo: 'none',
-    bg:'#FBF3E4', card:'#FFFEF9', ink:'#3B2F1E', accent:'#C2410C', sub:'#8A7355',
-    boxBg:['#FFFBF0','#FFFBF0','#FFFBF0','#FFFBF0','#FFFBF0'],
-    boxBd:['#E8D5A8','#E8D5A8','#E8D5A8','#E8D5A8','#E8D5A8'],
-    tipBg:'#FEF6E0', tipBd:'#E0BE72', underline:'#F5D78E', badge:'#C2410C',
-    deco(ctx){
-      rrect(ctx,56,92,968,940,16,'#FFFEF9','#3B2F1E',3);
-      // 클립
-      ctx.strokeStyle='#4B5563'; ctx.lineWidth=9; ctx.lineCap='round';
-      ctx.beginPath();
-      ctx.moveTo(528,150); ctx.lineTo(528,64);
-      ctx.arc(552,64,24,Math.PI,0); ctx.lineTo(576,140);
-      ctx.arc(552,140,24,0,Math.PI);
-      ctx.lineTo(540,78); ctx.stroke();
-      ctx.lineCap='butt';
-    }
-  },
-
-  bold: {
-    name: '🔳 모던', photo: 'none',
-    bg:'#1D4ED8', card:'#FFFFFF', ink:'#0F172A', accent:'#1D4ED8', sub:'#475569',
-    boxBg:['#F1F5F9','#F1F5F9','#F1F5F9','#F1F5F9','#F1F5F9'],
-    boxBd:['#1D4ED8','#1D4ED8','#1D4ED8','#1D4ED8','#1D4ED8'],
-    tipBg:'#EFF6FF', tipBd:'#1D4ED8', underline:'#93C5FD', badge:'#1D4ED8',
-    deco(ctx){
-      rrect(ctx,60,60,960,960,6,'#FFFFFF',null);
-      rrect(ctx,92,92,896,896,4,null,'#1D4ED8',5);
-    }
-  },
-
-  pastel: {
-    name: '🌸 파스텔', photo: 'none',
-    bg:'#CFEAFB', card:'#FFFFFF', ink:'#2B3A55', accent:'#EC4899', sub:'#7C8BA1',
-    boxBg:['#FFF1F6','#F0F9FF','#FFF7ED','#F0FDF4','#F5F3FF'],
-    boxBd:['#F9A8D4','#93C5FD','#FCD34D','#86EFAC','#C4B5FD'],
-    tipBg:'#FFF1F6', tipBd:'#F9A8D4', underline:'#FBCFE8', badge:'#EC4899',
-    deco(ctx){
-      // 물결 테두리 카드
-      ctx.save(); ctx.beginPath();
-      const r=34, x0=58, y0=58, x1=1022, y1=1022, step=48;
-      ctx.moveTo(x0+r,y0);
-      for(let x=x0+r;x<x1-r;x+=step) ctx.arcTo(x+step/2,y0-16,x+step,y0,r);
-      ctx.lineTo(x1-r,y0); ctx.arcTo(x1,y0,x1,y0+r,r);
-      ctx.lineTo(x1,y1-r); ctx.arcTo(x1,y1,x1-r,y1,r);
-      ctx.lineTo(x0+r,y1); ctx.arcTo(x0,y1,x0,y1-r,r);
-      ctx.lineTo(x0,y0+r); ctx.arcTo(x0,y0,x0+r,y0,r);
-      ctx.closePath(); ctx.fillStyle='#FFFFFF'; ctx.fill(); ctx.restore();
-    }
   }
 };
 
+// 지웠던 디자인(노트·메모지·모던·파스텔)이 저장돼 있을 수 있다. 없으면 사진형으로.
 let cardTemplate = localStorage.getItem('cn_template') || 'photo';
+if (!CARD_TEMPLATES[cardTemplate]) cardTemplate = 'photo';
 
 function setTemplate(id){
   cardTemplate = id;
