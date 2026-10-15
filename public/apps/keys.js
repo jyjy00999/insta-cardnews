@@ -110,4 +110,74 @@
   };
 
   global.StudioKeys = API;
+
+  /**
+   * 이미지 받아오기 — 서버는 주소만 주고, 내려받기는 브라우저가 한다.
+   *
+   * 예전엔 서버가 Pollinations 에서 받아 다시 보내줬다. 같은 그림이 서버
+   * 대역폭을 두 번 먹어서 무료 5GB 를 태우고 서비스가 멈췄다.
+   * Pollinations 는 CORS 를 열어 두므로 브라우저가 바로 받으면 된다.
+   *
+   * @param apiPath  주소를 알려주는 서버 경로 (쿼리 포함)
+   * @param opts.retries  무료 티어가 402 를 줄 때 다시 받을 횟수
+   * @returns Blob
+   */
+  // Pollinations 가 출처를 가린다. 배포 주소(https)에서는 브라우저가 바로 받을 수
+  // 있지만 localhost 에서는 403 이다. 한 번 막히면 그 뒤로는 바로 서버 중계로 간다.
+  let directBlocked = false;
+
+  global.fetchGeneratedImage = async function (apiPath, opts) {
+    const { retries = 3, onRetry } = opts || {};
+    const sep = apiPath.includes('?') ? '&' : '?';
+
+    /** 서버가 대신 받아 준다. 대역폭을 쓰지만 확실하다. */
+    async function viaProxy() {
+      const pr = await fetch(apiPath + sep + 'proxy=1', { signal: AbortSignal.timeout(180000) });
+      if (!pr.ok) {
+        const msg = await pr.json().then(d => d.error).catch(() => null);
+        throw new Error(msg || `이미지 생성 실패 (${pr.status})`);
+      }
+      const blob = await pr.blob();
+      if (blob.size < 2000) throw new Error('빈 이미지');
+      return blob;
+    }
+
+    if (directBlocked) return viaProxy();
+
+    // 1) 주소만 받아 브라우저가 직접 내려받기 — 서버 대역폭을 안 쓴다
+    const r = await fetch(apiPath);
+    const info = await r.json().catch(() => ({}));
+    if (!r.ok || !info.url) throw new Error(info.error || `이미지 주소 요청 실패 (${r.status})`);
+
+    let lastErr;
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        // 매번 다른 seed 를 붙여야 Pollinations 가 실패한 결과를 캐시해 두고
+        // 그대로 다시 주는 일이 없다.
+        const u = attempt === 0 ? info.url : info.url.replace(/([?&]seed=)\d+/, `$1${Date.now() % 99999}`);
+        const ir = await fetch(u, { signal: AbortSignal.timeout(120000) });
+        if (ir.status === 403) { directBlocked = true; break; }   // 출처 차단 — 중계로
+        if (!ir.ok) throw new Error(`HTTP ${ir.status}`);
+        const blob = await ir.blob();
+        if (blob.size < 2000) throw new Error('빈 이미지');
+        return blob;
+      } catch (e) {
+        lastErr = e;
+        // CORS 로 막히면 메시지 없이 TypeError 가 난다. 이것도 중계로 넘긴다.
+        if (e && e.name === 'TypeError') { directBlocked = true; break; }
+        if (attempt < retries - 1) {
+          if (onRetry) onRetry(attempt + 1, e);
+          // 무료 티어는 몰아치면 막는다. 쉬었다 다시 부르면 대개 풀린다.
+          await new Promise(s => setTimeout(s, 4000 * (attempt + 1)));
+        }
+      }
+    }
+
+    // 2) 직접이 막혔으면 서버가 대신 받는다
+    if (directBlocked) {
+      console.info('[이미지] 직접 받기가 막혀 서버 중계로 전환합니다.');
+      return viaProxy();
+    }
+    throw lastErr || new Error('이미지 생성 실패');
+  };
 })(window);

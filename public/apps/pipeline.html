@@ -2444,9 +2444,8 @@ async function generateOneImage(idx) {
 
     const noHumans = !cnNeedsCharacter;
     const url = `/api/pipeline/generate-image?prompt=${encodeURIComponent(fullPrompt)}&style=${encodeURIComponent(cnArtStyle)}&width=1080&height=1080&noHumans=${noHumans}`;
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(`서버 오류 ${r.status}`);
-    const blob = await r.blob();
+    // 서버는 주소만 주고 그림은 브라우저가 직접 받는다 (서버 대역폭 절약)
+    const blob = await fetchGeneratedImage(url, { retries: 2 });
     // data URL로 변환해 원본 보존 (텍스트 재적용 시 재사용)
     const rawDataUrl = await blobToDataUrl(blob);
     s.rawImgUrl = rawDataUrl;

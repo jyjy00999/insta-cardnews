@@ -4,7 +4,7 @@ const express = require('express');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { callAI, callAIStream, detectProvider, parseJson, proxyPollinationsImage, toClientError } = require('../lib/ai');
+const { callAI, callAIStream, detectProvider, parseJson, serveImage, toClientError } = require('../lib/ai');
 const { STAGES } = require('./pipeline-stages');
 
 const router = express.Router();
@@ -416,8 +416,7 @@ router.get('/generate-image', async (req, res) => {
   const s = seed || Math.floor(Math.random() * 99999);
   const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${width}&height=${height}&nologo=true&seed=${s}&model=flux&negative=${encodeURIComponent(negative)}`;
 
-  res.setHeader('X-Seed', String(s));
-  await proxyPollinationsImage(res, url, '파이프라인 이미지');
+  await serveImage(req, res, url, s, '이미지');
 });
 
 // ─── 이미지 검색 ──────────────────────────────────────────────────────────

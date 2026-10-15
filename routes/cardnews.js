@@ -1,6 +1,6 @@
 // 카드뉴스 / 인스타툰 생성 라우터  —  /api/cardnews/*
 const express = require('express');
-const { callAI, callVision, parseJson, proxyPollinationsImage, toClientError } = require('../lib/ai');
+const { callAI, callVision, parseJson, serveImage, toClientError } = require('../lib/ai');
 
 const router = express.Router();
 
@@ -114,8 +114,7 @@ router.get('/generate-image', async (req, res) => {
   const s = seed || Math.floor(Math.random() * 99999);
   const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1080&height=1080&nologo=true&seed=${s}&model=flux&negative=${encodeURIComponent(negative)}`;
 
-  res.setHeader('X-Seed', String(s));
-  await proxyPollinationsImage(res, url, '카드뉴스 이미지');
+  await serveImage(req, res, url, s, '이미지');
 });
 
 // ── 떡상 주제 추천 ─────────────────────────────────────────────

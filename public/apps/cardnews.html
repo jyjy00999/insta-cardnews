@@ -1028,10 +1028,8 @@ async function buildSlideImage(i, { retries = 3, seedShift = 0 } = {}){
         noHumans:noHumans?'true':'false', characterDesc:desc,
         seed: String(Math.floor(Math.random()*99999) + seedShift + attempt*17)
       });
-      const r=await fetch('/api/cardnews/generate-image?'+params);
-      if(!r.ok) throw new Error(`HTTP ${r.status}`);
-      const blob=await r.blob();
-      if(blob.size<2000) throw new Error('빈 이미지');   // 오류 JSON 이 섞여 오는 경우
+      // 서버는 주소만 주고 그림은 브라우저가 직접 받는다 (서버 대역폭 절약)
+      const blob=await fetchGeneratedImage('/api/cardnews/generate-image?'+params,{retries:1});
       let raw=await fileToDataUrl(blob);
       if(selectedChar>=0&&characters[selectedChar]&&!noHumans){
         raw=await composeChar(raw,characters[selectedChar].dataUrl);

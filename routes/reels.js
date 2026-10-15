@@ -1,6 +1,6 @@
 // 릴스 영상 메이커 라우터  —  /api/reels/*
 const express = require('express');
-const { callAI, callVision, parseJson, proxyPollinationsImage, toClientError } = require('../lib/ai');
+const { callAI, callVision, parseJson, serveImage, toClientError } = require('../lib/ai');
 
 const router = express.Router();
 
@@ -344,7 +344,7 @@ router.get('/generate-image', async (req, res) => {
 
   const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(full)}` +
     `?width=576&height=1024&nologo=true&seed=${s}&model=flux&negative=${encodeURIComponent(negative)}`;
-  await proxyPollinationsImage(res, url, '릴스 이미지');
+  await serveImage(req, res, url, s, '이미지');
 });
 
 module.exports = router;

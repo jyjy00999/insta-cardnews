@@ -712,10 +712,10 @@ async function generateReel(){
       // 캐릭터 설명을 장면마다 같이 보낸다. 서버가 이걸 프롬프트 앞에 세우고
       // person·face 억제를 풀어서, 올린 캐릭터가 실제로 장면에 나오게 한다.
       const charQ = charDesc ? `&character=${encodeURIComponent(charDesc)}` : '';
-      const ir = await fetch(`/api/reels/generate-image?prompt=${encodeURIComponent(sc.imagePrompt)}&seed=${i*1337+7+attempt*101}${charQ}`);
-      if(!ir.ok) throw new Error(`HTTP ${ir.status}`);
-      const blob = await ir.blob();
-      if(blob.size < 2000) throw new Error('빈 이미지');   // 오류 JSON 이 섞여 오는 경우
+      // 서버는 주소만 주고 그림은 브라우저가 직접 받는다 (서버 대역폭 절약)
+      const blob = await fetchGeneratedImage(
+        `/api/reels/generate-image?prompt=${encodeURIComponent(sc.imagePrompt)}&seed=${i*1337+7+attempt*101}${charQ}`,
+        { retries: 1 });
       const img = new Image();
       const ok = await new Promise(res=>{
         img.onload=()=>res(true); img.onerror=()=>res(false); img.src=URL.createObjectURL(blob);
