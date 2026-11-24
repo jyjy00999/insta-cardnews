@@ -2749,19 +2749,22 @@ const SP_THEMES = {
 
 const SP_TEMPLATES = {
   rank: {
-    name: '🏆 순위표', desc: '16칸 격자 순위',
+    name: '🏆 순위표', desc: '격자 순위',
     render(ctx, d, T) {
       const items = (d.items || []).slice(0, 16);
       const top = spHeader(ctx, d.title || '', '', T);
-      const cols = 4, gap = 18;
+      // 칸이 적을 때 4열로 깔면 마지막 줄이 휑하게 빈다. 줄이 고르게 차도록 열을 고른다.
+      const cols = items.length <= 4 ? 2 : items.length <= 9 ? 3 : 4, gap = 18;
       const cw = (1080 - 64 - gap * (cols - 1)) / cols;
       const rows = Math.ceil(items.length / cols) || 1;
       const avail = 1040 - top;
-      const chh = Math.min(200, (avail - gap * (rows - 1)) / rows);
+      const chh = Math.min(rows <= 2 ? 300 : 200, (avail - gap * (rows - 1)) / rows);
+      // 칸이 남으면 격자를 가운데로 내려 아래쪽만 휑하게 비지 않도록 한다
+      const gridTop = top + Math.max(0, (avail - (chh * rows + gap * (rows - 1))) / 2);
 
       items.forEach((it, i) => {
         const cx = 32 + (i % cols) * (cw + gap);
-        const cy = top + Math.floor(i / cols) * (chh + gap);
+        const cy = gridTop + Math.floor(i / cols) * (chh + gap);
         spRect(ctx, cx, cy, cw, chh, 16, T.card, T.line, 3);
         // 순위 알약
         const rank = `${it.rank || i + 1}위`;
@@ -2928,7 +2931,8 @@ const SP_TEMPLATES = {
     render(ctx, d, T) {
       const steps = (d.steps || []).slice(0, 6);
       const top = spHeader(ctx, d.title || '', '', T);
-      const arrow = 46;
+      // 단계가 많으면 화살표 자리를 줄여야 칸에 글이 들어간다
+      const arrow = steps.length >= 5 ? 30 : 46;
       const bh = Math.min(180, (1040 - top - arrow * (steps.length - 1)) / steps.length);
 
       steps.forEach((s, i) => {
@@ -3055,6 +3059,10 @@ function spClearBase() { spBase = null; spResults = {}; }
 // 한 번에 몇 분씩 걸리기도 해서, 일정 시간이 지나면 끊고 다음으로 넘어간다.
 const SP_TIMEOUT_MS = 75000;
 
+// 여섯 장이 모두 이 개수를 그린다. 서버의 SP_ITEM_COUNT 와 같은 수.
+// 더 늘리면 단계흐름과 비교표의 글자가 읽을 수 없게 작아진다.
+const SP_SHOW = 6;
+
 let spBase = null;   // AI 가 한 번 만들어 준 공통 재료
 
 /** 주제로 공통 재료를 한 번 받아온다 */
@@ -3153,51 +3161,50 @@ async function spDownloadAll() {
  * 공통 재료 하나를 각 틀에 맞는 모양으로 바꾼다.
  *
  * 예전엔 틀마다 AI 를 따로 불러서 같은 주제인데 내용이 전부 달랐다. 이제 한 번
- * 받은 items 를 여섯 틀이 나눠 쓴다. 보여주는 개수는 틀마다 다르므로, 부제의
- * 숫자는 실제로 그리는 개수에서 뽑아 쓴다. 제목에 숫자를 넣지 않는 이유도 그것.
+ * 받은 items 를 여섯 틀이 그대로 나눠 쓴다 — 같은 항목, 같은 개수, 같은 순서.
+ * 숫자는 제목이 아니라 실제로 그린 개수에서 뽑아 부제에 붙인다.
  */
 function spShape(base, tplId) {
-  const items = (base.items || []).filter(it => it && String(it.label || '').trim());
+  // 여섯 장이 같은 항목을, 같은 개수로, 같은 순서로 쓴다.
+  const items = (base.items || [])
+    .filter(it => it && String(it.label || '').trim())
+    .slice(0, SP_SHOW);
   const T = base.title || '';
-  const n  = items.length;
+  const n = items.length;
 
   switch (tplId) {
     case 'rank':
       return { title: T, subtitle: `${n}가지`,
                items: items.map((it, i) => ({ rank: i + 1, label: it.label, note: it.note || '' })) };
 
-    case 'topn': {
-      const top = items.slice(0, 7);
-      return { title: T, subtitle: base.hook || `놓치면 안 될 ${top.length}가지`,
-               items: top.map((it, i) => ({ n: i + 1, label: it.label, desc: it.desc || it.note || '' })) };
-    }
+    case 'topn':
+      return { title: T, subtitle: base.hook || `놓치면 안 될 ${n}가지`,
+               items: items.map((it, i) => ({ n: i + 1, label: it.label, desc: it.desc || it.note || '' })) };
 
     case 'pyramid':
       return { title: T,
-               items: items.slice(0, 12).map((it, i) => ({ rank: i + 1, label: it.label, tag: it.note || '' })) };
+               items: items.map((it, i) => ({ rank: i + 1, label: it.label, tag: it.note || '' })) };
 
-    case 'numbered': {
-      const six = items.slice(0, 6);
+    case 'numbered':
       return { title: T, subtitle: base.hook || '',
-               items: six.map((it, i) => ({ n: i + 1, head: it.label, body: it.desc || '' })) };
-    }
+               items: items.map((it, i) => ({ n: i + 1, head: it.label, body: it.desc || '' })) };
 
     case 'compare': {
-      // 항목마다 받아 둔 wrong / right 을 좌우로 맞물린다
-      const rows = items.filter(it => it.wrong || it.right).slice(0, 6)
-        .map(it => ({ left: it.wrong || '', right: it.right || '' }));
+      // 항목마다 받아 둔 wrong / right 을 좌우로 맞물린다.
+      // 한 항목이라도 비어 있으면 줄 수가 줄어 다른 장과 어긋나므로, 빈 칸은
+      // 그 항목의 이름·설명으로 메워서 개수를 지킨다.
       return { title: T,
                leftTitle: base.leftTitle || '흔한 실수',
                rightTitle: base.rightTitle || '제대로 하기',
-               rows: rows.length ? rows
-                 : items.slice(0, 6).map(it => ({ left: it.label, right: it.desc || '' })) };
+               rows: items.map(it => ({
+                 left:  it.wrong || it.label || '',
+                 right: it.right || it.desc  || ''
+               })) };
     }
 
-    case 'steps': {
-      const four = items.slice(0, 4);
+    case 'steps':
       return { title: T,
-               steps: four.map((it, i) => ({ n: i + 1, head: it.label, body: it.desc || '' })) };
-    }
+               steps: items.map((it, i) => ({ n: i + 1, head: it.label, body: it.desc || '' })) };
 
     default:
       return base;
