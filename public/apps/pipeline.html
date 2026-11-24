@@ -3048,73 +3048,86 @@ function spSetTemplate(id) {
   renderOutputArea();
 }
 
+/** 주제가 바뀌면 들고 있던 재료는 버린다 */
+function spClearBase() { spBase = null; spResults = {}; }
+
 // 한 장이 오래 끌면 나머지가 통째로 묶인다. 키 없이 Pollinations 로 가면
 // 한 번에 몇 분씩 걸리기도 해서, 일정 시간이 지나면 끊고 다음으로 넘어간다.
 const SP_TIMEOUT_MS = 75000;
 
-/** 한 종류를 받아 그린다. 실패하면 그 사실을 결과에 남긴다. */
-async function spBuildOne(topic, id) {
+let spBase = null;   // AI 가 한 번 만들어 준 공통 재료
+
+/** 주제로 공통 재료를 한 번 받아온다 */
+async function spFetchBase(topic) {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), SP_TIMEOUT_MS);
   try {
     const r = await fetch('/api/pipeline/single-post', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, template: id, apiKey }),
+      body: JSON.stringify({ topic, apiKey }),
       signal: ac.signal
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
-    spResults[id] = { data, img: spRender(data, id) };
-  } catch (e) {
-    spResults[id] = {
-      error: e.name === 'AbortError'
-        ? '시간이 너무 걸려 건너뛰었습니다. ⚙️ 설정에 Groq 키를 넣으면 빨라집니다.'
-        : (e.message || '실패')
-    };
+    return data;
   } finally {
     clearTimeout(timer);
   }
 }
 
-/** 6가지를 차례로 만든다. 하나씩 끝날 때마다 화면에 더한다. */
-async function spGenerate() {
-  const topic = document.getElementById('topic').value.trim();
-  if (!topic) { alert('주제를 입력해주세요.'); return; }
-
-  const ids = Object.keys(SP_TEMPLATES);
-  spResults = {}; spBusy = true;
-
-  for (let i = 0; i < ids.length; i++) {
-    const id = ids[i];
-    spProgress = `${i + 1}/${ids.length} ${SP_TEMPLATES[id].name} 만드는 중...`;
-    renderOutputArea();
-    await spBuildOne(topic, id);
-    renderOutputArea();                 // 완성되는 대로 바로 보여준다
-    // 무료 티어가 몰아치는 호출을 막으므로 사이를 띄운다
-    if (i < ids.length - 1) await new Promise(r => setTimeout(r, 900));
-  }
-
-  spBusy = false; spProgress = '';
-  renderOutputArea();
-
-  const failed = Object.values(spResults).filter(r => r.error).length;
-  if (failed) {
-    const box = document.getElementById('sp-err');
-    if (box) {
-      box.style.display = 'block';
-      box.textContent = `${ids.length - failed}장 완성, ${failed}장 실패했습니다. 실패한 것만 [↺ 다시]로 채울 수 있습니다.`;
+/** 받아 둔 재료로 여섯 장을 그린다. AI 를 다시 부르지 않는다. */
+function spDrawAll() {
+  spResults = {};
+  for (const id of Object.keys(SP_TEMPLATES)) {
+    try {
+      spResults[id] = { data: spShape(spBase, id), img: spRender(spShape(spBase, id), id) };
+    } catch (e) {
+      spResults[id] = { error: e.message || '그리기 실패' };
     }
   }
 }
 
-/** 한 장만 다시 만든다 */
-async function spRetryOne(id) {
+/** 한 번 받아서 여섯 장을 모두 만든다 */
+async function spGenerate() {
   const topic = document.getElementById('topic').value.trim();
   if (!topic) { alert('주제를 입력해주세요.'); return; }
-  spBusy = true; spProgress = `${SP_TEMPLATES[id].name} 다시 만드는 중...`;
+
+  spResults = {}; spBase = null;
+  spBusy = true; spProgress = '내용 만드는 중...';
   renderOutputArea();
-  await spBuildOne(topic, id);
+
+  try {
+    spBase = await spFetchBase(topic);
+  } catch (e) {
+    spBusy = false; spProgress = '';
+    renderOutputArea();
+    const box = document.getElementById('sp-err');
+    if (box) {
+      box.style.display = 'block';
+      box.textContent = e.name === 'AbortError'
+        ? '시간이 너무 걸립니다. ⚙️ 설정에 Groq 키를 넣으면 빨라집니다.'
+        : (e.message || '실패');
+    }
+    return;
+  }
+
+  spProgress = '카드 그리는 중...';
+  renderOutputArea();
+  spDrawAll();
+
   spBusy = false; spProgress = '';
+  renderOutputArea();
+}
+
+/** 같은 재료로 그 한 장만 다시 그린다 (AI 를 다시 부르지 않는다) */
+function spRetryOne(id) {
+  if (!spBase) return;
+  try {
+    const shaped = spShape(spBase, id);
+    spResults[id] = { data: shaped, img: spRender(shaped, id) };
+  } catch (e) {
+    spResults[id] = { error: e.message || '그리기 실패' };
+  }
   renderOutputArea();
 }
 
@@ -3133,6 +3146,61 @@ async function spDownloadAll() {
     if (!spResults[id] || !spResults[id].img) continue;
     spDownload(id);
     await new Promise(r => setTimeout(r, 400));
+  }
+}
+
+/**
+ * 공통 재료 하나를 각 틀에 맞는 모양으로 바꾼다.
+ *
+ * 예전엔 틀마다 AI 를 따로 불러서 같은 주제인데 내용이 전부 달랐다. 이제 한 번
+ * 받은 items 를 여섯 틀이 나눠 쓴다. 보여주는 개수는 틀마다 다르므로, 부제의
+ * 숫자는 실제로 그리는 개수에서 뽑아 쓴다. 제목에 숫자를 넣지 않는 이유도 그것.
+ */
+function spShape(base, tplId) {
+  const items = (base.items || []).filter(it => it && String(it.label || '').trim());
+  const T = base.title || '';
+  const n  = items.length;
+
+  switch (tplId) {
+    case 'rank':
+      return { title: T, subtitle: `${n}가지`,
+               items: items.map((it, i) => ({ rank: i + 1, label: it.label, note: it.note || '' })) };
+
+    case 'topn': {
+      const top = items.slice(0, 7);
+      return { title: T, subtitle: base.hook || `놓치면 안 될 ${top.length}가지`,
+               items: top.map((it, i) => ({ n: i + 1, label: it.label, desc: it.desc || it.note || '' })) };
+    }
+
+    case 'pyramid':
+      return { title: T,
+               items: items.slice(0, 12).map((it, i) => ({ rank: i + 1, label: it.label, tag: it.note || '' })) };
+
+    case 'numbered': {
+      const six = items.slice(0, 6);
+      return { title: T, subtitle: base.hook || '',
+               items: six.map((it, i) => ({ n: i + 1, head: it.label, body: it.desc || '' })) };
+    }
+
+    case 'compare': {
+      // 항목마다 받아 둔 wrong / right 을 좌우로 맞물린다
+      const rows = items.filter(it => it.wrong || it.right).slice(0, 6)
+        .map(it => ({ left: it.wrong || '', right: it.right || '' }));
+      return { title: T,
+               leftTitle: base.leftTitle || '흔한 실수',
+               rightTitle: base.rightTitle || '제대로 하기',
+               rows: rows.length ? rows
+                 : items.slice(0, 6).map(it => ({ left: it.label, right: it.desc || '' })) };
+    }
+
+    case 'steps': {
+      const four = items.slice(0, 4);
+      return { title: T,
+               steps: four.map((it, i) => ({ n: i + 1, head: it.label, body: it.desc || '' })) };
+    }
+
+    default:
+      return base;
   }
 }
 

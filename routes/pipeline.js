@@ -263,101 +263,73 @@ ${needsCharHint}
   }
 });
 
-// ─── 단일 포스트 템플릿 데이터 ────────────────────────────────────────────
-// 한 장짜리 인포그래픽은 형태마다 필요한 데이터가 다르다.
-// 순위표는 16칸, TOP N 은 항목+설명, 비교형은 좌우 쌍… 그래서 틀마다 따로 받는다.
-const SINGLE_POST_SHAPES = {
-  rank: {
-    name: '순위표',
-    count: '16',
-    schema: `{
-  "title": "한 줄 제목 (18자 이내, 예: MBTI 인성 좋은 순위)",
-  "items": [{ "rank": 1, "label": "항목명 (8자 이내)", "note": "짧은 한마디 (10자 이내, 없으면 \\"\\")" }]
-}`,
-    guide: 'items 는 정확히 16개. rank 는 1부터 16까지 순서대로.'
-  },
-  topn: {
-    name: 'TOP N 리스트',
-    count: '7',
-    schema: `{
-  "title": "한 줄 제목 (20자 이내)",
-  "subtitle": "부제 (25자 이내, 없으면 \\"\\")",
-  "items": [{ "n": 1, "label": "항목명 (12자 이내)", "desc": "설명 (22자 이내)" }]
-}`,
-    guide: 'items 는 7개. 1위가 가장 중요한 것.'
-  },
-  pyramid: {
-    name: '피라미드 순위',
-    count: '12',
-    schema: `{
-  "title": "한 줄 제목 (18자 이내)",
-  "items": [{ "rank": 1, "label": "항목명 (8자 이내)", "tag": "비유 한 단어 (6자 이내, 예: 블랙홀)" }]
-}`,
-    guide: 'items 는 12개. 1위가 꼭대기. tag 는 그 순위를 빗댄 재미있는 단어.'
-  },
-  numbered: {
-    name: '번호 설명',
-    count: '6',
-    schema: `{
-  "title": "한 줄 제목 (20자 이내)",
-  "subtitle": "부제 (25자 이내, 없으면 \\"\\")",
-  "items": [{ "n": 1, "head": "소제목 (14자 이내)", "body": "설명 (45자 이내, 두 줄까지)" }]
-}`,
-    guide: 'items 는 6개. head 는 핵심, body 는 그 이유나 방법.'
-  },
-  compare: {
-    name: '비교형',
-    count: '6',
-    schema: `{
-  "title": "한 줄 제목 (18자 이내)",
-  "leftTitle": "왼쪽 기둥 제목 (10자 이내)",
-  "rightTitle": "오른쪽 기둥 제목 (10자 이내)",
-  "rows": [{ "left": "왼쪽 내용 (16자 이내)", "right": "오른쪽 내용 (16자 이내)" }]
-}`,
-    guide: 'rows 는 6개. 같은 줄의 좌우는 반드시 맞물리는 내용으로.'
-  },
-  steps: {
-    name: '단계 흐름',
-    count: '4',
-    schema: `{
-  "title": "한 줄 제목 (20자 이내)",
-  "steps": [{ "n": 1, "head": "단계 이름 (12자 이내)", "body": "설명 (35자 이내)" }]
-}`,
-    guide: 'steps 는 4개. 순서대로 따라 하면 되게.'
-  }
-};
+// ─── 단일 포스트 — 한 번 받아 6가지 모양으로 ──────────────────────────────
+//
+// 예전에는 틀마다 AI 를 따로 불렀다. 그래서 같은 주제인데 순위표·TOP N·피라미드의
+// 내용이 전부 달랐고, 개수도 제각각이라 제목이 "12선"인데 16칸이 나오기도 했다.
+// 이제 한 번만 불러 12개짜리 재료를 받고, 각 틀이 그걸 잘라 쓴다.
+// 호출이 6번에서 1번으로 줄어 속도와 할당량도 같이 아낀다.
+const SP_ITEM_COUNT = 12;
+
+/** 제목에 든 개수 표기가 실제와 어긋나지 않게 떼어낸다 ("이사 체크리스트 12선" → "이사 체크리스트") */
+function stripCount(title) {
+  return String(title || '')
+    .replace(/\s*\d+\s*(선|가지|개|위)\s*$/u, '')
+    .replace(/\s*(TOP|top)\s*\d+\s*$/u, '')
+    .trim();
+}
 
 router.post('/single-post', async (req, res) => {
-  const { topic, template, apiKey } = req.body;
+  const { topic, apiKey } = req.body;
   if (!topic?.trim()) return res.status(400).json({ error: '주제를 입력해주세요.' });
 
-  const shape = SINGLE_POST_SHAPES[template];
-  if (!shape) return res.status(400).json({ error: '알 수 없는 템플릿입니다.' });
-
   const prompt = `인스타그램에서 저장·공유가 터지는 한 장짜리 카드를 만든다.
-형태: ${shape.name}
 주제: ${topic}
 
-${shape.guide}
+이 재료 하나로 순위표·TOP N·피라미드·번호설명·비교표·단계흐름 여섯 가지 카드를
+만들 것이다. 그러니 어느 모양에 넣어도 말이 되게 써라.
+
+items 는 정확히 ${SP_ITEM_COUNT}개. 중요한 것부터 순서대로.
+
+각 항목이 담아야 할 것:
+  label  무엇인지 (짧은 이름)
+  note   한 단어 요약 — 순위표·피라미드의 꼬리표로 쓴다
+  desc   한 줄 설명 — TOP N·번호설명·단계흐름의 본문으로 쓴다
+  wrong  사람들이 흔히 하는 실수
+  right  제대로 하는 방법
+
+⚠️ title 에는 숫자를 쓰지 마라. ("이사 체크리스트 12선" ✗ → "이사 체크리스트" ○)
+   카드마다 보여주는 개수가 달라서 숫자를 넣으면 내용과 어긋난다. 개수는 앱이 붙인다.
 
 읽는 사람이 "오 맞아" 하고 무릎을 치게 구체적으로 쓴다.
 뻔한 말, 교과서 같은 설명은 쓰지 않는다.
 글자 수 제한을 반드시 지킨다. 넘치면 카드 밖으로 밀려 나간다.
 
 아래 JSON 형식으로만 답한다 (다른 말 없이):
-${shape.schema}`;
+{
+  "title": "제목 (숫자 없이, 16자 이내)",
+  "hook": "한 줄 후킹 문구 (22자 이내)",
+  "leftTitle": "비교표 왼쪽 기둥 이름 (8자 이내, 예: 흔한 실수)",
+  "rightTitle": "비교표 오른쪽 기둥 이름 (8자 이내, 예: 제대로 하기)",
+  "items": [{
+    "label": "항목 이름 (10자 이내)",
+    "note": "한 단어 요약 (6자 이내)",
+    "desc": "한 줄 설명 (24자 이내)",
+    "wrong": "흔한 실수 (15자 이내)",
+    "right": "제대로 하는 법 (15자 이내)"
+  }]
+}`;
 
   try {
-    const raw = await callAI(apiKey, prompt, 4000);
-    const data = parseJson(raw, shape.name);
+    const raw = await callAI(apiKey, prompt, 6000);
+    const data = parseJson(raw, '단일 포스트');
 
     // 형식만 맞고 알맹이가 빈 응답이 올라온다. 그대로 넘기면 빈 카드가 그려지므로
     // 여기서 걸러서 다시 해보라고 알린다. 무료 모델일수록 자주 그런다.
-    const list = data.items || data.rows || data.steps;
-    const filled = Array.isArray(list)
-      ? list.filter(o => o && Object.values(o).some(v => String(v || '').trim())).length
-      : 0;
-    if (!String(data.title || '').trim() || filled < 2) {
+    const items = Array.isArray(data.items)
+      ? data.items.filter(o => o && String(o.label || '').trim())
+      : [];
+    if (!String(data.title || '').trim() || items.length < 4) {
       const e = new Error(
         'AI 가 형식에 맞는 내용을 만들지 못했습니다.\n' +
         '다시 시도하거나, 주제를 조금 더 구체적으로 적어주세요.\n' +
@@ -366,7 +338,13 @@ ${shape.schema}`;
       e.status = 502; throw e;
     }
 
-    res.json(data);
+    res.json({
+      title: stripCount(data.title),      // 모델이 숫자를 넣어 보내도 떼어낸다
+      hook: data.hook || '',
+      leftTitle: data.leftTitle || '흔한 실수',
+      rightTitle: data.rightTitle || '제대로 하기',
+      items: items.slice(0, SP_ITEM_COUNT)
+    });
   } catch (err) {
     console.error('[pipeline/single-post]', err.message);
     const e = toClientError(err);
