@@ -296,9 +296,7 @@ items 는 정확히 ${SP_ITEM_COUNT}개. 중요한 것부터 순서대로.
 각 항목이 담아야 할 것:
   label  무엇인지 (짧은 이름)
   note   한 단어 요약 — 순위표·피라미드의 꼬리표로 쓴다
-  desc   한 줄 설명 — TOP N·번호설명·단계흐름의 본문으로 쓴다
-  wrong  사람들이 흔히 하는 실수
-  right  제대로 하는 방법
+  desc   한 줄 설명 — 나머지 카드의 본문으로 쓴다
 
 ⚠️ title 에는 숫자를 쓰지 마라. ("이사 체크리스트 6선" ✗ → "이사 체크리스트" ○)
    개수는 앱이 세어서 붙인다. 네가 쓴 숫자는 실제 장수와 어긋나기 쉽다.
@@ -311,14 +309,12 @@ items 는 정확히 ${SP_ITEM_COUNT}개. 중요한 것부터 순서대로.
 {
   "title": "제목 (숫자 없이, 16자 이내)",
   "hook": "한 줄 후킹 문구 (22자 이내)",
-  "leftTitle": "비교표 왼쪽 기둥 이름 (8자 이내, 예: 흔한 실수)",
-  "rightTitle": "비교표 오른쪽 기둥 이름 (8자 이내, 예: 제대로 하기)",
+  "leftTitle": "비교표 왼쪽 기둥 이름 — label 들이 들어간다 (8자 이내, 예: 체크 항목)",
+  "rightTitle": "비교표 오른쪽 기둥 이름 — desc 들이 들어간다 (8자 이내, 예: 해야 할 일)",
   "items": [{
     "label": "항목 이름 (10자 이내)",
     "note": "한 단어 요약 (6자 이내)",
-    "desc": "한 줄 설명 (24자 이내)",
-    "wrong": "흔한 실수 (15자 이내)",
-    "right": "제대로 하는 법 (15자 이내)"
+    "desc": "한 줄 설명 (24자 이내)"
   }]
 }`;
 
@@ -343,8 +339,8 @@ items 는 정확히 ${SP_ITEM_COUNT}개. 중요한 것부터 순서대로.
     res.json({
       title: stripCount(data.title),      // 모델이 숫자를 넣어 보내도 떼어낸다
       hook: data.hook || '',
-      leftTitle: data.leftTitle || '흔한 실수',
-      rightTitle: data.rightTitle || '제대로 하기',
+      leftTitle: data.leftTitle || '체크 항목',
+      rightTitle: data.rightTitle || '이렇게 하세요',
       items: items.slice(0, SP_ITEM_COUNT)
     });
   } catch (err) {

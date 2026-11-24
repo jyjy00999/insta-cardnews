@@ -2915,13 +2915,14 @@ const SP_TEMPLATES = {
         const y = sy + i * (rh + gap);
         spRect(ctx, lx, y, colW, rh, 14, T.card, T.line, 2);
         spRect(ctx, rx, y, colW, rh, 14, T.card, T.line, 2);
-        ctx.fillStyle = T.ink;
-        [[r.left, lx], [r.right, rx]].forEach(([txt, x]) => {
-          ctx.font = `700 27px ${SP_FONT}`;
-          const l = spWrap(ctx, txt || '', colW - 40, 2);
-          const oy = l.length > 1 ? -16 : 0;
-          l.forEach((t, k) => ctx.fillText(t, x + colW / 2, y + rh / 2 + oy + k * 33));
-        });
+        // 왼쪽은 항목 이름이라 짧고 굵게, 오른쪽은 설명이라 얇고 작게
+        [[r.left, lx, '900 29px', T.ink], [r.right, rx, '600 25px', T.sub]]
+          .forEach(([txt, x, font, color]) => {
+            ctx.font = `${font} ${SP_FONT}`; ctx.fillStyle = color;
+            const l = spWrap(ctx, txt || '', colW - 40, 2);
+            const oy = l.length > 1 ? -16 : 0;
+            l.forEach((t, k) => ctx.fillText(t, x + colW / 2, y + rh / 2 + oy + k * 32));
+          });
       });
     }
   },
@@ -3189,18 +3190,13 @@ function spShape(base, tplId) {
       return { title: T, subtitle: base.hook || '',
                items: items.map((it, i) => ({ n: i + 1, head: it.label, body: it.desc || '' })) };
 
-    case 'compare': {
-      // 항목마다 받아 둔 wrong / right 을 좌우로 맞물린다.
-      // 한 항목이라도 비어 있으면 줄 수가 줄어 다른 장과 어긋나므로, 빈 칸은
-      // 그 항목의 이름·설명으로 메워서 개수를 지킨다.
+    case 'compare':
+      // 왼쪽은 다른 다섯 장과 똑같은 항목 이름, 오른쪽은 그 항목의 한 줄 설명.
+      // 예전엔 여기만 '흔한 실수 / 제대로 하기' 라는 다른 글을 썼다.
       return { title: T,
-               leftTitle: base.leftTitle || '흔한 실수',
-               rightTitle: base.rightTitle || '제대로 하기',
-               rows: items.map(it => ({
-                 left:  it.wrong || it.label || '',
-                 right: it.right || it.desc  || ''
-               })) };
-    }
+               leftTitle: base.leftTitle || '체크 항목',
+               rightTitle: base.rightTitle || '이렇게 하세요',
+               rows: items.map(it => ({ left: it.label || '', right: it.desc || it.note || '' })) };
 
     case 'steps':
       return { title: T,
